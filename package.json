@@ -1,0 +1,12 @@
+{
+  "name": "github-chartify",
+  "version": "1.0.0",
+  "description": "Fetch and visualize GitHub contribution data",
+  "scripts": {
+    "fetch": "node scripts/fetch-contributions.js",
+    "generate": "node scripts/generate-svg.js",
+    "build": "npm run fetch && npm run generate"
+  },
+  "keywords": ["github", "contributions", "chart"],
+  "license": "MIT"
+}

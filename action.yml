@@ -1,0 +1,89 @@
+
+name: 'GitHub Chartify'
+description: 'Generate an animated SVG visualization of GitHub contribution graph'
+author: 'iranovianti'
+
+branding:
+  icon: 'bar-chart-2'
+  color: 'green'
+
+inputs:
+  github_username:
+    description: 'GitHub username to fetch contributions for (defaults to repository owner)'
+    required: false
+    default: ${{ github.repository_owner }}
+  output_path:
+    description: 'Path to save the generated SVG'
+    required: false
+    default: 'data/contributions.svg'
+  speed:
+    description: 'Animation speed: fast, medium, or slow'
+    required: false
+    default: 'fast'
+  mode:
+    description: 'Animation mode: both, vertical (by week), or horizontal (by day)'
+    required: false
+    default: 'both'
+  loop:
+    description: 'Whether animation loops indefinitely'
+    required: false
+    default: 'true'
+  transform_style:
+    description: 'Transform style: rectangle or circles'
+    required: false
+    default: 'rectangle'
+  grow_on_join:
+    description: 'If true, bars grow as cells land'
+    required: false
+    default: 'true'
+  bar_color:
+    description: 'Bar color (hex, e.g. #216e39)'
+    required: false
+    default: '#216e39'
+
+outputs:
+  svg_path:
+    description: 'Path to the generated SVG file (light theme)'
+    value: ${{ steps.generate.outputs.svg_path }}
+  svg_path_dark:
+    description: 'Path to the generated SVG file (dark theme)'
+    value: ${{ steps.generate.outputs.svg_path_dark }}
+  total_contributions:
+    description: 'Total number of contributions in the past year'
+    value: ${{ steps.fetch.outputs.total_contributions }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Fetch contribution data
+      id: fetch
+      shell: bash
+      env:
+        GITHUB_USERNAME: ${{ inputs.github_username }}
+      run: |
+        node ${{ github.action_path }}/scripts/fetch-contributions.js
+        echo "total_contributions=$(jq .totalContributions ${{ github.action_path }}/data/contributions.json)" >> $GITHUB_OUTPUT
+
+    - name: Generate SVG animation
+      id: generate
+      shell: bash
+      env:
+        SVG_SPEED: ${{ inputs.speed }}
+        SVG_MODE: ${{ inputs.mode }}
+        SVG_LOOP: ${{ inputs.loop }}
+        SVG_TRANSFORM_STYLE: ${{ inputs.transform_style }}
+        SVG_GROW_ON_JOIN: ${{ inputs.grow_on_join }}
+        SVG_BAR_COLOR: ${{ inputs.bar_color }}
+        SVG_OUTPUT_PATH: ${{ inputs.output_path }}
+      run: |
+        node ${{ github.action_path }}/scripts/generate-svg.js
+        echo "svg_path=${{ inputs.output_path }}" >> $GITHUB_OUTPUT
+        # Compute dark version path
+        DARK_PATH="${{ inputs.output_path }}"
+        DARK_PATH="${DARK_PATH%.svg}-dark.svg"
+        echo "svg_path_dark=$DARK_PATH" >> $GITHUB_OUTPUT
