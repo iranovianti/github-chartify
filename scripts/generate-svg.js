@@ -355,8 +355,6 @@ function generateSVG(contributionData, config, theme = 'light') {
 <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
   <title>GitHub Contributions Animation</title>
   
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  
   <!-- Month labels -->
   ${monthLabelElements.join('\n  ')}
   
