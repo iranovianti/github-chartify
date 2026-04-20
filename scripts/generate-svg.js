@@ -259,12 +259,16 @@ function generateSVG(contributionData, config, theme = 'light') {
         );
         // Offset landing time by stagger delay so circle lands when bar expects it
         const vLandingTime = vLandingEntry ? (vLandingEntry.landingTime + staggerDelay) : undefined;
+        const vPrevCumulativeHeight = vLandingEntry ? (vLandingEntry.cumulativeHeight - vLandingEntry.height) : 0;
+        const vCumulativeHeight = vLandingEntry ? vLandingEntry.cumulativeHeight : 0;
         
         // For horizontal, find this cell's landing time in its row
         const hActiveIndex = weeks.slice(0, weekIndex).filter(w => w.days[dayIndex]?.heightMultiplier > 0).length;
         const hLandingEntry = rowLandingData[dayIndex]?.[hActiveIndex];
         // Offset by stagger delay for horizontal too
         const hLandingTime = hLandingEntry ? (hLandingEntry.landingTime + staggerDelay) : undefined;
+        const hPrevCumulativeWidth = hLandingEntry ? (hLandingEntry.cumulativeWidth - hLandingEntry.width) : 0;
+        const hCumulativeWidth = hLandingEntry ? hLandingEntry.cumulativeWidth : 0;
         
         // Pass all needed data to renderer
         cells.push(renderer.renderActiveCell({
@@ -286,7 +290,11 @@ function generateSVG(contributionData, config, theme = 'light') {
           weekIndex,
           dayIndex,
           vLandingTime,
-          hLandingTime
+          hLandingTime,
+          vPrevCumulativeHeight,
+          vCumulativeHeight,
+          hPrevCumulativeWidth,
+          hCumulativeWidth
         }));
         
         vStackOffset += vBarHeight;

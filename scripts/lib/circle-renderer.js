@@ -19,7 +19,7 @@ class CircleCellRenderer extends BaseCellRenderer {
   }
 
   renderActiveCell(cellData) {
-    const { x, y, color, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, level, vLandingTime, hLandingTime } = cellData;
+    const { x, y, color, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, level, vLandingTime, hLandingTime, vPrevCumulativeHeight, vCumulativeHeight, hPrevCumulativeWidth, hCumulativeWidth } = cellData;
     const V = this.vCycle.times;
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
@@ -31,27 +31,37 @@ class CircleCellRenderer extends BaseCellRenderer {
     const cx = x + CELL_SIZE / 2;
     const cy = y + CELL_SIZE / 2;
 
-    // Stacked positions
-    let vStackedCy = cy, hStackedCx = cx, hStackedCy = cy;
+    // Arrival = bar top BEFORE this cell lands; Departure = bar top AFTER (used in reverse, invisible during hold)
+    let vArrivalCy = cy, vDepartureCy = cy;
+    let hArrivalCx = cx, hArrivalCy = cy;
+    let hDepartureCx = cx, hDepartureCy = cy;
     
     if (this.stack.growOnJoin && this.includeVertical) {
-      vStackedCy = vGridBottom - vTotalHeight + radius;
+      vArrivalCy = vGridBottom - (vPrevCumulativeHeight || 0);
+      vDepartureCy = vGridBottom - (vCumulativeHeight || 0);
     } else if (this.includeVertical) {
-      vStackedCy = vY + vH - radius;
+      vArrivalCy = vY + vH - radius;
+      vDepartureCy = vArrivalCy;
     }
     
     if (this.stack.growOnJoin && this.includeHorizontal) {
-      hStackedCx = hGridLeft + hTotalWidth - radius;
-      hStackedCy = cy;
+      hArrivalCx = hGridLeft + (hPrevCumulativeWidth || 0);
+      hArrivalCy = cy;
+      hDepartureCx = hGridLeft + (hCumulativeWidth || 0);
+      hDepartureCy = cy;
     } else if (this.includeHorizontal) {
-      hStackedCx = hX + radius;
-      hStackedCy = y + CELL_SIZE / 2;
+      hArrivalCx = hX + radius;
+      hArrivalCy = y + CELL_SIZE / 2;
+      hDepartureCx = hArrivalCx;
+      hDepartureCy = hArrivalCy;
     }
 
     // Animation states
-    const grid     = { cx, cy };
-    const vStacked = { cx, cy: vStackedCy };
-    const hStacked = { cx: hStackedCx, cy: hStackedCy };
+    const grid       = { cx, cy };
+    const vArrival   = { cx, cy: vArrivalCy };
+    const vDeparture = { cx, cy: vDepartureCy };
+    const hArrival   = { cx: hArrivalCx, cy: hArrivalCy };
+    const hDeparture = { cx: hDepartureCx, cy: hDepartureCy };
 
     const mainFrames = [];
     const opKeyArr = [];
@@ -69,8 +79,8 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: V.transformStart, props: grid },
           { time: V.transformEnd, props: grid },
           { time: vStackStart, props: grid },
-          { time: vStackFinish, props: vStacked },
-          { time: V.holdEnd, props: vStacked }
+          { time: vStackFinish, props: vArrival },
+          { time: V.holdEnd, props: vArrival }
         );
         if (this.stack.growOnJoin) {
           opKeyArr.push(V.start, V.transformStart, V.transformEnd, Math.max(V.transformEnd, vStackFinish - 0.001), vStackFinish, V.holdEnd);
@@ -99,9 +109,9 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: V.transformStart, props: grid },
           { time: V.transformEnd, props: grid },
           { time: vStackStart, props: grid },
-          { time: vStackFinish, props: vStacked },
-          { time: V.holdEnd, props: vStacked },
-          { time: vUnstackStart, props: vStacked },
+          { time: vStackFinish, props: vArrival },
+          { time: V.holdEnd, props: vDeparture },
+          { time: vUnstackStart, props: vDeparture },
           { time: vUnstackFinish, props: grid },
           { time: V.unstackEnd, props: grid },
           { time: V.untransformEnd, props: grid },
@@ -132,8 +142,8 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: H.transformStart, props: grid },
           { time: H.transformEnd, props: grid },
           { time: hStackStart, props: grid },
-          { time: hStackFinish, props: hStacked },
-          { time: H.holdEnd, props: hStacked }
+          { time: hStackFinish, props: hArrival },
+          { time: H.holdEnd, props: hArrival }
         );
         if (this.stack.growOnJoin) {
           opKeyArr.push(H.transformStart, H.transformEnd, Math.max(H.transformEnd, hStackFinish - 0.001), hStackFinish, H.holdEnd);
@@ -161,9 +171,9 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: H.transformStart, props: grid },
           { time: H.transformEnd, props: grid },
           { time: hStackStart, props: grid },
-          { time: hStackFinish, props: hStacked },
-          { time: H.holdEnd, props: hStacked },
-          { time: hUnstackStart, props: hStacked },
+          { time: hStackFinish, props: hArrival },
+          { time: H.holdEnd, props: hDeparture },
+          { time: hUnstackStart, props: hDeparture },
           { time: hUnstackFinish, props: grid },
           { time: H.unstackEnd, props: grid },
           { time: H.untransformEnd, props: grid },
