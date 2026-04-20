@@ -8,6 +8,7 @@ const {
   CELL_SIZE,
   LEVEL_TO_COUNT
 } = require('./base-renderer');
+const { AnimationTimeline } = require('./animation-timeline');
 
 // Circle sizing
 const CIRCLE_RADIUS = 2.5;
@@ -68,61 +69,61 @@ class CircleCellRenderer extends BaseCellRenderer {
     const { x, y, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, vStackIndex, hStackIndex } = cellData;
     const V = this.vCycle.times;
     const H = this.hCycle.times;
+    const forwardOnly = !this.loop;
     
-    // Original position is center of cell (from 2x2 grid)
+    // Original position
     const originalCx = pos.cx;
     const originalCy = pos.cy;
     
+    // Compute stacked positions
     let vStackedCy = originalCy, hStackedCx = originalCx, hStackedCy = originalCy;
     
     if (this.stack.growOnJoin && this.includeVertical) {
-      const barTopWhenFull = vGridBottom - vTotalHeight;
-      vStackedCy = barTopWhenFull + CIRCLE_RADIUS;
+      vStackedCy = vGridBottom - vTotalHeight + CIRCLE_RADIUS;
     } else if (!this.stack.growOnJoin && this.includeVertical) {
-      const segmentBottom = vY + vH;
-      vStackedCy = segmentBottom - (circleIndex * CIRCLE_SPACING) - CIRCLE_RADIUS;
+      vStackedCy = vY + vH - (circleIndex * CIRCLE_SPACING) - CIRCLE_RADIUS;
     }
     
     if (this.stack.growOnJoin && this.includeHorizontal) {
-      const barRightWhenFull = hGridLeft + hTotalWidth;
-      hStackedCx = barRightWhenFull - CIRCLE_RADIUS;
+      hStackedCx = hGridLeft + hTotalWidth - CIRCLE_RADIUS;
       hStackedCy = originalCy;
     } else if (!this.stack.growOnJoin && this.includeHorizontal) {
       hStackedCx = hX + (circleIndex * CIRCLE_SPACING) + CIRCLE_RADIUS;
       hStackedCy = y + CELL_SIZE / 2;
     }
-    
-    // Build mode-aware keyframes
-    const keyTimesArr = [];
-    const cxValsArr = [];
-    const cyValsArr = [];
+
+    // Animation states
+    const grid    = { cx: originalCx, cy: originalCy };
+    const vStacked = { cx: originalCx, cy: vStackedCy };
+    const hStacked = { cx: hStackedCx, cy: hStackedCy };
+
+    const mainFrames = [];
     const opKeyArr = [];
     const opValsArr = [];
-    const forwardOnly = !this.loop;
     
     if (this.includeVertical) {
-      // V cycle timing
       const vDelay = this.stagger.enabled ? staggerDelay : 0;
       const vStackDur = this.timing.vStackDur;
       const vStackStart = V.transformEnd + vDelay;
       const vStackFinish = vLandingTime || (vStackStart + vStackDur);
       
       if (forwardOnly) {
-        // Forward only: grid → transform → stack → hold (end at stacked position)
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, vStackStart, vStackFinish, V.holdEnd);
-        cxValsArr.push(originalCx, originalCx, originalCx, originalCx, originalCx, originalCx);
-        cyValsArr.push(originalCy, originalCy, originalCy, originalCy, vStackedCy, vStackedCy);
-        
-        // Opacity: appear during transform, disappear when landing (absorbed by bar)
+        mainFrames.push(
+          { time: V.start, props: grid },
+          { time: V.transformStart, props: grid },
+          { time: V.transformEnd, props: grid },
+          { time: vStackStart, props: grid },
+          { time: vStackFinish, props: vStacked },
+          { time: V.holdEnd, props: vStacked }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(V.start, V.transformStart, V.transformEnd, Math.max(V.transformEnd, vStackFinish - 0.001), vStackFinish, V.holdEnd);
           opValsArr.push(0, 0, 1, 1, 0, 0);
         } else {
           opKeyArr.push(V.start, V.transformStart, V.transformEnd, V.holdEnd);
-          opValsArr.push(0, 0, 1, 1);  // Circles stay visible at stacked position
+          opValsArr.push(0, 0, 1, 1);
         }
       } else {
-        // Full cycle with reverse
         let vUnstackStart, vUnstackFinish;
         if (this.stack.steppedReverse && vLandingTime) {
           const stackDur = V.stackEnd - V.transformEnd;
@@ -137,10 +138,18 @@ class CircleCellRenderer extends BaseCellRenderer {
           vUnstackFinish = vUnstackStart + vStackDur;
         }
         
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, vStackStart, vStackFinish, V.holdEnd, vUnstackStart, vUnstackFinish, V.untransformEnd, V.end);
-        cxValsArr.push(originalCx, originalCx, originalCx, originalCx, originalCx, originalCx, originalCx, originalCx, originalCx, originalCx);
-        cyValsArr.push(originalCy, originalCy, originalCy, originalCy, vStackedCy, vStackedCy, vStackedCy, originalCy, originalCy, originalCy);
-        
+        mainFrames.push(
+          { time: V.start, props: grid },
+          { time: V.transformStart, props: grid },
+          { time: V.transformEnd, props: grid },
+          { time: vStackStart, props: grid },
+          { time: vStackFinish, props: vStacked },
+          { time: V.holdEnd, props: vStacked },
+          { time: vUnstackStart, props: vStacked },
+          { time: vUnstackFinish, props: grid },
+          { time: V.untransformEnd, props: grid },
+          { time: V.end, props: grid }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(V.start, V.transformStart, V.transformEnd, Math.max(V.transformEnd, vStackFinish - 0.001), vStackFinish, vUnstackStart, vUnstackStart + 0.001, V.unstackEnd, V.untransformEnd, V.end);
           opValsArr.push(0, 0, 1, 1, 0, 0, 1, 1, 0, 0);
@@ -150,37 +159,33 @@ class CircleCellRenderer extends BaseCellRenderer {
         }
       }
     } else {
-      // No V cycle - start with grid state
-      keyTimesArr.push(0);
-      cxValsArr.push(originalCx);
-      cyValsArr.push(originalCy);
+      mainFrames.push({ time: 0, props: grid });
       opKeyArr.push(0);
       opValsArr.push(0);
     }
     
     if (this.includeHorizontal) {
-      // H cycle timing
       const hDelay = this.stagger.enabled ? staggerDelay : 0;
       const hStackDur = this.timing.vStackDur * this.timing.hSpeedMult;
       const hStackStart = H.transformEnd + hDelay;
       const hStackFinish = hLandingTime || (hStackStart + hStackDur);
       
       if (forwardOnly) {
-        // Forward only: grid → transform → stack → hold (end at stacked position)
-        keyTimesArr.push(H.transformStart, H.transformEnd, hStackStart, hStackFinish, H.holdEnd);
-        cxValsArr.push(originalCx, originalCx, originalCx, hStackedCx, hStackedCx);
-        cyValsArr.push(hStackedCy, hStackedCy, hStackedCy, hStackedCy, hStackedCy);
-        
-        // Opacity: appear during transform, disappear when landing (absorbed by bar)
+        mainFrames.push(
+          { time: H.transformStart, props: grid },
+          { time: H.transformEnd, props: grid },
+          { time: hStackStart, props: grid },
+          { time: hStackFinish, props: hStacked },
+          { time: H.holdEnd, props: hStacked }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(H.transformStart, H.transformEnd, Math.max(H.transformEnd, hStackFinish - 0.001), hStackFinish, H.holdEnd);
           opValsArr.push(0, 1, 1, 0, 0);
         } else {
           opKeyArr.push(H.transformStart, H.transformEnd, H.holdEnd);
-          opValsArr.push(0, 1, 1);  // Circles stay visible at stacked position
+          opValsArr.push(0, 1, 1);
         }
       } else {
-        // Full cycle with reverse
         let hUnstackStart, hUnstackFinish;
         if (this.stack.steppedReverse && hLandingTime) {
           const stackDur = H.stackEnd - H.transformEnd;
@@ -195,10 +200,17 @@ class CircleCellRenderer extends BaseCellRenderer {
           hUnstackFinish = hUnstackStart + hStackDur;
         }
         
-        keyTimesArr.push(H.transformStart, H.transformEnd, hStackStart, hStackFinish, H.holdEnd, hUnstackStart, hUnstackFinish, H.untransformEnd, H.end);
-        cxValsArr.push(originalCx, originalCx, originalCx, hStackedCx, hStackedCx, hStackedCx, originalCx, originalCx, originalCx);
-        cyValsArr.push(hStackedCy, hStackedCy, hStackedCy, hStackedCy, hStackedCy, hStackedCy, hStackedCy, originalCy, originalCy);
-        
+        mainFrames.push(
+          { time: H.transformStart, props: grid },
+          { time: H.transformEnd, props: grid },
+          { time: hStackStart, props: grid },
+          { time: hStackFinish, props: hStacked },
+          { time: H.holdEnd, props: hStacked },
+          { time: hUnstackStart, props: hStacked },
+          { time: hUnstackFinish, props: grid },
+          { time: H.untransformEnd, props: grid },
+          { time: H.end, props: grid }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(H.transformStart, H.transformEnd, Math.max(H.transformEnd, hStackFinish - 0.001), hStackFinish, hUnstackStart, hUnstackStart + 0.001, H.unstackEnd, H.untransformEnd, H.end);
           opValsArr.push(0, 1, 1, 0, 0, 1, 1, 0, 0);
@@ -208,24 +220,18 @@ class CircleCellRenderer extends BaseCellRenderer {
         }
       }
     } else if (!forwardOnly) {
-      // No H cycle - end at current state (only for looping mode)
-      const endTime = this.totalDuration;
-      keyTimesArr.push(endTime);
-      cxValsArr.push(originalCx);
-      cyValsArr.push(originalCy);
-      opKeyArr.push(endTime);
+      mainFrames.push({ time: this.totalDuration, props: grid });
+      opKeyArr.push(this.totalDuration);
       opValsArr.push(0);
     }
     
-    const keyTimes = keyTimesArr.map(t => this.f(t)).join('; ');
-    const cxVals = cxValsArr.join('; ');
-    const cyVals = cyValsArr.join('; ');
+    const main = AnimationTimeline.fromKeyframes(this.totalDuration, mainFrames);
     const opKeyTimes = opKeyArr.map(t => this.f(t)).join('; ');
     const opVals = opValsArr.join('; ');
     
     return `<circle cx="${originalCx}" cy="${originalCy}" r="${CIRCLE_RADIUS}" fill="${this.barColor}">
-    <animate attributeName="cx" values="${cxVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="cy" values="${cyVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="cx" values="${main.cx.values}" keyTimes="${main.cx.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="cy" values="${main.cy.values}" keyTimes="${main.cy.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="opacity" values="${opVals}" keyTimes="${opKeyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </circle>`;
   }
