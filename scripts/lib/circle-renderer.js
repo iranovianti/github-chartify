@@ -1,5 +1,5 @@
 /**
- * CircleCellRenderer - Renders cells as single circles with variable radius
+ * CircleCellRenderer - Morphs grid rects into circles via animated rx/ry
  * Level 1=small, Level 2=medium, Level 3=large, Level 4=full size
  */
 

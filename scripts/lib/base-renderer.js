@@ -42,15 +42,6 @@ const LEVEL_TO_MULTIPLIER = {
   'FOURTH_QUARTILE': 1.0
 };
 
-// Level to circle count (for circle renderer)
-const LEVEL_TO_COUNT = {
-  'NONE': 0,
-  'FIRST_QUARTILE': 1,
-  'SECOND_QUARTILE': 2,
-  'THIRD_QUARTILE': 3,
-  'FOURTH_QUARTILE': 4
-};
-
 // Speed presets (timing values in seconds)
 const SPEED_PRESETS = {
   fast: { gridHold: 0.25, transformDur: 0.25, vStackDur: 0.5, stackedHold: 0.5, hSpeedMult: 3.0 },
@@ -498,6 +489,5 @@ module.exports = {
   LEVEL_COLORS,
   LEVEL_COLORS_DARK,
   getLevelColors,
-  LEVEL_TO_MULTIPLIER,
-  LEVEL_TO_COUNT
+  LEVEL_TO_MULTIPLIER
 };
