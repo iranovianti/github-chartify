@@ -32,14 +32,6 @@ inputs:
     description: 'Transform style: rectangle or circles'
     required: false
     default: 'rectangle'
-  grow_on_join:
-    description: 'If true, bars grow as cells land'
-    required: false
-    default: 'true'
-  bar_color:
-    description: 'Bar color (hex, e.g. #216e39)'
-    required: false
-    default: '#216e39'
 
 outputs:
   svg_path:
@@ -58,7 +50,7 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Fetch contribution data
       id: fetch
@@ -77,8 +69,6 @@ runs:
         SVG_MODE: ${{ inputs.mode }}
         SVG_LOOP: ${{ inputs.loop }}
         SVG_TRANSFORM_STYLE: ${{ inputs.transform_style }}
-        SVG_GROW_ON_JOIN: ${{ inputs.grow_on_join }}
-        SVG_BAR_COLOR: ${{ inputs.bar_color }}
         SVG_OUTPUT_PATH: ${{ inputs.output_path }}
       run: |
         node ${{ github.action_path }}/scripts/generate-svg.js
