@@ -67,7 +67,7 @@ runs:
         GITHUB_USERNAME: ${{ inputs.github_username }}
       run: |
         node ${{ github.action_path }}/scripts/fetch-contributions.js
-        echo "total_contributions=$(jq .totalContributions ${{ github.action_path }}/data/contributions.json)" >> $GITHUB_OUTPUT
+        echo "total_contributions=$(node -e "console.log(require('${{ github.action_path }}/data/contributions.json').totalContributions)")" >> $GITHUB_OUTPUT
 
     - name: Generate SVG animation
       id: generate
