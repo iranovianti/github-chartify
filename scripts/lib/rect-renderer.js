@@ -60,9 +60,19 @@ class RectCellRenderer extends BaseCellRenderer {
           opValsArr.push(1, 1);
         }
       } else {
-        const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-        const vUnstackStart = V.holdEnd + vReverseDelay;
-        const vUnstackFinish = vUnstackStart + vStackDur;
+        let vUnstackStart, vUnstackFinish;
+        if (this.stack.growOnJoin && vLandingTime) {
+          const stackDur = V.stackEnd - V.transformEnd;
+          const unstackDur = V.unstackEnd - V.holdEnd;
+          const landingFraction = stackDur > 0 ? (vLandingTime - V.transformEnd) / stackDur : 0;
+          const departFraction = 1 - landingFraction;
+          vUnstackStart = V.holdEnd + departFraction * unstackDur;
+          vUnstackFinish = V.unstackEnd;
+        } else {
+          const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
+          vUnstackStart = V.holdEnd + vReverseDelay;
+          vUnstackFinish = vUnstackStart + vStackDur;
+        }
 
         mainFrames.push(
           { time: V.start, props: grid },
@@ -73,6 +83,7 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: V.holdEnd, props: vStacked },
           { time: vUnstackStart, props: vStacked },
           { time: vUnstackFinish, props: vShrunk },
+          { time: V.unstackEnd, props: vShrunk },
           { time: V.untransformEnd, props: grid },
           { time: V.end, props: grid }
         );
@@ -114,9 +125,19 @@ class RectCellRenderer extends BaseCellRenderer {
           opValsArr.push(1, 1);
         }
       } else {
-        const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-        const hUnstackStart = H.holdEnd + hReverseDelay;
-        const hUnstackFinish = hUnstackStart + hStackDur;
+        let hUnstackStart, hUnstackFinish;
+        if (this.stack.growOnJoin && hLandingTime) {
+          const stackDur = H.stackEnd - H.transformEnd;
+          const unstackDur = H.unstackEnd - H.holdEnd;
+          const landingFraction = stackDur > 0 ? (hLandingTime - H.transformEnd) / stackDur : 0;
+          const departFraction = 1 - landingFraction;
+          hUnstackStart = H.holdEnd + departFraction * unstackDur;
+          hUnstackFinish = H.unstackEnd;
+        } else {
+          const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
+          hUnstackStart = H.holdEnd + hReverseDelay;
+          hUnstackFinish = hUnstackStart + hStackDur;
+        }
 
         mainFrames.push(
           { time: H.transformStart, props: grid },
@@ -126,6 +147,7 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: H.holdEnd, props: hStacked },
           { time: hUnstackStart, props: hStacked },
           { time: hUnstackFinish, props: hShrunk },
+          { time: H.unstackEnd, props: hShrunk },
           { time: H.untransformEnd, props: grid },
           { time: H.end, props: grid }
         );
@@ -193,7 +215,30 @@ class RectCellRenderer extends BaseCellRenderer {
       yValsArr.push(y);
       
       if (!forwardOnly) {
-        // Shrink back
+        // Stepped shrink: bar shrinks in steps as each cell departs (reverse of growth)
+        const stackDur = V.stackEnd - V.transformEnd;
+        const unstackDur = V.unstackEnd - V.holdEnd;
+        
+        const reversedData = [...landingData].reverse();
+        reversedData.forEach((d, i) => {
+          const landingFraction = stackDur > 0 ? (d.landingTime - V.transformEnd) / stackDur : 0;
+          const departFraction = 1 - landingFraction;
+          const departTime = V.holdEnd + departFraction * unstackDur;
+          
+          const prevHeight = i === 0 ? h : reversedData[i].cumulativeHeight;
+          const remainingHeight = i === reversedData.length - 1 ? 0 : reversedData[i + 1].cumulativeHeight;
+          
+          if (departTime > V.holdEnd) {
+            keyTimesArr.push(this.f(departTime - 0.001));
+            heightValsArr.push(prevHeight);
+            yValsArr.push(bottomY - prevHeight);
+          }
+          
+          keyTimesArr.push(this.f(departTime));
+          heightValsArr.push(remainingHeight);
+          yValsArr.push(bottomY - remainingHeight);
+        });
+        
         keyTimesArr.push(this.f(V.unstackEnd));
         heightValsArr.push(0);
         yValsArr.push(bottomY);
@@ -298,7 +343,28 @@ class RectCellRenderer extends BaseCellRenderer {
       widthValsArr.push(w);
       
       if (!forwardOnly) {
-        // Shrink back
+        // Stepped shrink: bar shrinks in steps as each cell departs (reverse of growth)
+        const stackDur = H.stackEnd - H.transformEnd;
+        const unstackDur = H.unstackEnd - H.holdEnd;
+        
+        const reversedData = [...landingData].reverse();
+        reversedData.forEach((d, i) => {
+          const landingFraction = stackDur > 0 ? (d.landingTime - H.transformEnd) / stackDur : 0;
+          const departFraction = 1 - landingFraction;
+          const departTime = H.holdEnd + departFraction * unstackDur;
+          
+          const prevWidth = i === 0 ? w : reversedData[i].cumulativeWidth;
+          const remainingWidth = i === reversedData.length - 1 ? 0 : reversedData[i + 1].cumulativeWidth;
+          
+          if (departTime > H.holdEnd) {
+            keyTimesArr.push(this.f(departTime - 0.001));
+            widthValsArr.push(prevWidth);
+          }
+          
+          keyTimesArr.push(this.f(departTime));
+          widthValsArr.push(remainingWidth);
+        });
+        
         keyTimesArr.push(this.f(H.unstackEnd));
         widthValsArr.push(0);
         

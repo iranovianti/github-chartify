@@ -147,6 +147,7 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: V.holdEnd, props: vStacked },
           { time: vUnstackStart, props: vStacked },
           { time: vUnstackFinish, props: grid },
+          { time: V.unstackEnd, props: grid },
           { time: V.untransformEnd, props: grid },
           { time: V.end, props: grid }
         );
@@ -208,6 +209,7 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: H.holdEnd, props: hStacked },
           { time: hUnstackStart, props: hStacked },
           { time: hUnstackFinish, props: grid },
+          { time: H.unstackEnd, props: grid },
           { time: H.untransformEnd, props: grid },
           { time: H.end, props: grid }
         );
@@ -288,7 +290,7 @@ class CircleCellRenderer extends BaseCellRenderer {
             const departTime = V.holdEnd + departFraction * unstackDur;
             
             const remainingHeight = i === reversedData.length - 1 ? 0 : reversedData[i + 1].cumulativeHeight;
-            const prevHeight = i === 0 ? h : reversedData[i - 1].cumulativeHeight;
+            const prevHeight = i === 0 ? h : reversedData[i].cumulativeHeight;
             
             if (departTime > V.holdEnd) {
               keyTimesArr.push(this.f(departTime - 0.001));
@@ -403,7 +405,7 @@ class CircleCellRenderer extends BaseCellRenderer {
             const departTime = H.holdEnd + departFraction * unstackDur;
             
             const remainingWidth = i === reversedData.length - 1 ? 0 : reversedData[i + 1].cumulativeWidth;
-            const prevWidth = i === 0 ? w : reversedData[i - 1].cumulativeWidth;
+            const prevWidth = i === 0 ? w : reversedData[i].cumulativeWidth;
             
             if (departTime > H.holdEnd) {
               keyTimesArr.push(this.f(departTime - 0.001));
