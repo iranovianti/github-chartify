@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate contribution chart
-        uses: iranovianti/github-chartify@main
+        uses: iranovianti/github-chartify@v1
         with:
           output_path: 'data/contributions.svg'
           speed: 'fast'             # fast, medium, or slow
