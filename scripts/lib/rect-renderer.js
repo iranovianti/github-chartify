@@ -9,74 +9,12 @@
 
 const {
   BaseCellRenderer,
-  CELL_SIZE,
-  LEVEL_COLORS
+  CELL_SIZE
 } = require('./base-renderer');
 
 class RectCellRenderer extends BaseCellRenderer {
-  constructor(config, theme = 'light') {
-    super(config, theme);
-  }
-
   getName() {
     return 'rectangle';
-  }
-
-  getCellStackHeight(day) {
-    return Math.round(day.heightMultiplier * CELL_SIZE);
-  }
-
-  getCellStackWidth(day) {
-    return Math.round(day.heightMultiplier * CELL_SIZE);
-  }
-
-  renderEmptyCell(x, y, color) {
-    const V = this.vCycle.times;
-    const H = this.hCycle.times;
-    const forwardOnly = !this.loop;
-    
-    // Build mode-aware keyframes
-    const keyTimesArr = [];
-    const opacityArr = [];
-    
-    if (this.includeVertical) {
-      if (forwardOnly) {
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, V.holdEnd);
-        opacityArr.push(1, 1, 0, 0);
-      } else {
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, V.unstackEnd, V.untransformEnd, V.end);
-        opacityArr.push(1, 1, 0, 0, 1, 1);
-      }
-    } else {
-      keyTimesArr.push(0);
-      opacityArr.push(1);
-    }
-    
-    if (this.includeHorizontal) {
-      if (forwardOnly) {
-        if (this.includeVertical) {
-          // Already hidden from V cycle, just extend to H.holdEnd
-          keyTimesArr.push(H.holdEnd);
-          opacityArr.push(0);
-        } else {
-          keyTimesArr.push(H.transformStart, H.transformEnd, H.holdEnd);
-          opacityArr.push(1, 0, 0);
-        }
-      } else {
-        keyTimesArr.push(H.transformStart, H.transformEnd, H.unstackEnd, H.untransformEnd, H.end);
-        opacityArr.push(1, 0, 0, 1, 1);
-      }
-    } else if (!forwardOnly) {
-      keyTimesArr.push(this.totalDuration);
-      opacityArr.push(1);
-    }
-    
-    const keyTimes = keyTimesArr.map(t => this.f(t)).join('; ');
-    const opacity = opacityArr.join('; ');
-    
-    return `<rect x="${x}" y="${y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="2" ry="2" fill="${color}">
-    <animate attributeName="opacity" values="${opacity}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-  </rect>`;
   }
 
   renderActiveCell(cellData) {

@@ -279,28 +279,62 @@ class BaseCellRenderer {
 
   // ========== Methods to be overridden by subclasses ==========
 
-  /**
-   * Get the height this cell contributes to vertical stack
-   * Override in subclass
-   */
   getCellStackHeight(day) {
-    throw new Error('getCellStackHeight must be implemented by subclass');
+    return Math.round(day.heightMultiplier * CELL_SIZE);
   }
 
-  /**
-   * Get the width this cell contributes to horizontal stack
-   * Override in subclass
-   */
   getCellStackWidth(day) {
-    throw new Error('getCellStackWidth must be implemented by subclass');
+    return Math.round(day.heightMultiplier * CELL_SIZE);
   }
 
   /**
    * Render an empty (level=NONE) cell
-   * Override in subclass
    */
   renderEmptyCell(x, y, color) {
-    throw new Error('renderEmptyCell must be implemented by subclass');
+    const V = this.vCycle.times;
+    const H = this.hCycle.times;
+    const forwardOnly = !this.loop;
+    
+    const keyTimesArr = [];
+    const opacityArr = [];
+    
+    if (this.includeVertical) {
+      if (forwardOnly) {
+        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, V.holdEnd);
+        opacityArr.push(1, 1, 0, 0);
+      } else {
+        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, V.unstackEnd, V.untransformEnd, V.end);
+        opacityArr.push(1, 1, 0, 0, 1, 1);
+      }
+    } else {
+      keyTimesArr.push(0);
+      opacityArr.push(1);
+    }
+    
+    if (this.includeHorizontal) {
+      if (forwardOnly) {
+        if (this.includeVertical) {
+          keyTimesArr.push(H.holdEnd);
+          opacityArr.push(0);
+        } else {
+          keyTimesArr.push(H.transformStart, H.transformEnd, H.holdEnd);
+          opacityArr.push(1, 0, 0);
+        }
+      } else {
+        keyTimesArr.push(H.transformStart, H.transformEnd, H.unstackEnd, H.untransformEnd, H.end);
+        opacityArr.push(1, 0, 0, 1, 1);
+      }
+    } else if (!forwardOnly) {
+      keyTimesArr.push(this.totalDuration);
+      opacityArr.push(1);
+    }
+    
+    const keyTimes = keyTimesArr.map(t => this.f(t)).join('; ');
+    const opacity = opacityArr.join('; ');
+    
+    return `<rect x="${x}" y="${y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="2" ry="2" fill="${color}">
+    <animate attributeName="opacity" values="${opacity}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+  </rect>`;
   }
 
   /**
