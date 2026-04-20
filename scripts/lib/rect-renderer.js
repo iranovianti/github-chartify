@@ -11,6 +11,7 @@ const {
   BaseCellRenderer,
   CELL_SIZE
 } = require('./base-renderer');
+const { AnimationTimeline } = require('./animation-timeline');
 
 class RectCellRenderer extends BaseCellRenderer {
   getName() {
@@ -22,127 +23,59 @@ class RectCellRenderer extends BaseCellRenderer {
     const V = this.vCycle.times;
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
-    
     const vMidY = y + (CELL_SIZE - vH);
-    
-    // Build mode-aware keyframes
-    const keyTimesArr = [];
-    const yValsArr = [];
-    const hValsArr = []; // height
-    const xValsArr = [];
-    const wValsArr = []; // width
-    const cValsArr = []; // color
-    const rValsArr = []; // radius
-    
-    if (this.includeVertical) {
-      const vDelay = this.stagger.enabled ? staggerDelay : 0;
-      const vStackDur = this.timing.vStackDur;
-      const vStackStart = V.transformEnd + vDelay;
-      const vStackFinish = (this.stack.growOnJoin && vLandingTime) ? vLandingTime : vStackStart + vStackDur;
-      
-      if (forwardOnly) {
-        // Forward-only: grid → transform → stack → hold (end at stacked position)
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, vStackStart, vStackFinish, V.holdEnd);
-        yValsArr.push(y, y, vMidY, vMidY, vY, vY);
-        hValsArr.push(CELL_SIZE, CELL_SIZE, vH, vH, vH, vH);
-        xValsArr.push(x, x, x, x, x, x);
-        wValsArr.push(CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        cValsArr.push(color, color, this.barColor, this.barColor, this.barColor, this.barColor);
-        rValsArr.push(2, 2, 0, 0, 0, 0);
-      } else {
-        const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-        const vUnstackStart = V.holdEnd + vReverseDelay;
-        const vUnstackFinish = vUnstackStart + vStackDur;
-        
-        // Full cycle (10 points)
-        keyTimesArr.push(V.start, V.transformStart, V.transformEnd, vStackStart, vStackFinish, V.holdEnd, vUnstackStart, vUnstackFinish, V.untransformEnd, V.end);
-        yValsArr.push(y, y, vMidY, vMidY, vY, vY, vY, vMidY, y, y);
-        hValsArr.push(CELL_SIZE, CELL_SIZE, vH, vH, vH, vH, vH, vH, CELL_SIZE, CELL_SIZE);
-        xValsArr.push(x, x, x, x, x, x, x, x, x, x);
-        wValsArr.push(CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        cValsArr.push(color, color, this.barColor, this.barColor, this.barColor, this.barColor, this.barColor, this.barColor, color, color);
-        rValsArr.push(2, 2, 0, 0, 0, 0, 0, 0, 2, 2);
-      }
-    } else {
-      keyTimesArr.push(0);
-      yValsArr.push(y);
-      hValsArr.push(CELL_SIZE);
-      xValsArr.push(x);
-      wValsArr.push(CELL_SIZE);
-      cValsArr.push(color);
-      rValsArr.push(2);
-    }
-    
-    if (this.includeHorizontal) {
-      const hDelay = this.stagger.enabled ? staggerDelay : 0;
-      const hStackDur = this.timing.vStackDur * this.timing.hSpeedMult;
-      const hStackStart = H.transformEnd + hDelay;
-      const hStackFinish = (this.stack.growOnJoin && hLandingTime) ? hLandingTime : hStackStart + hStackDur;
-      
-      if (forwardOnly) {
-        // Forward-only: grid → transform → stack → hold (end at stacked position)
-        keyTimesArr.push(H.transformStart, H.transformEnd, hStackStart, hStackFinish, H.holdEnd);
-        yValsArr.push(y, y, y, y, y);
-        hValsArr.push(CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        xValsArr.push(x, x, x, hX, hX);
-        wValsArr.push(CELL_SIZE, hW, hW, hW, hW);
-        cValsArr.push(color, this.barColor, this.barColor, this.barColor, this.barColor);
-        rValsArr.push(2, 0, 0, 0, 0);
-      } else {
-        const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-        const hUnstackStart = H.holdEnd + hReverseDelay;
-        const hUnstackFinish = hUnstackStart + hStackDur;
-        
-        // H cycle keyframes (9 points)
-        keyTimesArr.push(H.transformStart, H.transformEnd, hStackStart, hStackFinish, H.holdEnd, hUnstackStart, hUnstackFinish, H.untransformEnd, H.end);
-        yValsArr.push(y, y, y, y, y, y, y, y, y);
-        hValsArr.push(CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        xValsArr.push(x, x, x, hX, hX, hX, x, x, x);
-        wValsArr.push(CELL_SIZE, hW, hW, hW, hW, hW, hW, CELL_SIZE, CELL_SIZE);
-        cValsArr.push(color, this.barColor, this.barColor, this.barColor, this.barColor, this.barColor, this.barColor, color, color);
-        rValsArr.push(2, 0, 0, 0, 0, 0, 0, 2, 2);
-      }
-    } else if (!forwardOnly) {
-      keyTimesArr.push(this.totalDuration);
-      yValsArr.push(y);
-      hValsArr.push(CELL_SIZE);
-      xValsArr.push(x);
-      wValsArr.push(CELL_SIZE);
-      cValsArr.push(color);
-      rValsArr.push(2);
-    }
-    
-    const keyTimes = keyTimesArr.map(t => this.f(t)).join('; ');
-    const yVals = yValsArr.join('; ');
-    const hVals = hValsArr.join('; ');
-    const xVals = xValsArr.join('; ');
-    const wVals = wValsArr.join('; ');
-    const cVals = cValsArr.join('; ');
-    const rVals = rValsArr.join('; ');
-    
-    // Build opacity animation (mode-aware)
+
+    // Animation states
+    const grid     = { y, height: CELL_SIZE, x, width: CELL_SIZE, fill: color, r: 2 };
+    const vShrunk  = { y: vMidY, height: vH, x, width: CELL_SIZE, fill: this.barColor, r: 0 };
+    const vStacked = { y: vY, height: vH, x, width: CELL_SIZE, fill: this.barColor, r: 0 };
+    const hShrunk  = { y, height: CELL_SIZE, x, width: hW, fill: this.barColor, r: 0 };
+    const hStacked = { y, height: CELL_SIZE, x: hX, width: hW, fill: this.barColor, r: 0 };
+
+    const mainFrames = [];
     const opKeyArr = [];
     const opValsArr = [];
-    
+
     if (this.includeVertical) {
       const vDelay = this.stagger.enabled ? staggerDelay : 0;
       const vStackDur = this.timing.vStackDur;
       const vStackStart = V.transformEnd + vDelay;
       const vStackFinish = (this.stack.growOnJoin && vLandingTime) ? vLandingTime : vStackStart + vStackDur;
       const vLand = vLandingTime || vStackFinish;
-      
+
       if (forwardOnly) {
+        mainFrames.push(
+          { time: V.start, props: grid },
+          { time: V.transformStart, props: grid },
+          { time: V.transformEnd, props: vShrunk },
+          { time: vStackStart, props: vShrunk },
+          { time: vStackFinish, props: vStacked },
+          { time: V.holdEnd, props: vStacked }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, V.holdEnd);
-          opValsArr.push(1, 1, 0, 0);  // Disappear when landing, stay hidden
+          opValsArr.push(1, 1, 0, 0);
         } else {
           opKeyArr.push(V.start, V.holdEnd);
-          opValsArr.push(1, 1);  // Stay visible at stacked position
+          opValsArr.push(1, 1);
         }
       } else {
         const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
         const vUnstackStart = V.holdEnd + vReverseDelay;
-        
+        const vUnstackFinish = vUnstackStart + vStackDur;
+
+        mainFrames.push(
+          { time: V.start, props: grid },
+          { time: V.transformStart, props: grid },
+          { time: V.transformEnd, props: vShrunk },
+          { time: vStackStart, props: vShrunk },
+          { time: vStackFinish, props: vStacked },
+          { time: V.holdEnd, props: vStacked },
+          { time: vUnstackStart, props: vStacked },
+          { time: vUnstackFinish, props: vShrunk },
+          { time: V.untransformEnd, props: grid },
+          { time: V.end, props: grid }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, vUnstackStart, vUnstackStart + 0.001, V.end);
           opValsArr.push(1, 1, 0, 0, 1, 1);
@@ -153,29 +86,49 @@ class RectCellRenderer extends BaseCellRenderer {
         }
       }
     } else {
+      mainFrames.push({ time: 0, props: grid });
       opKeyArr.push(0);
       opValsArr.push(1);
     }
-    
+
     if (this.includeHorizontal) {
       const hDelay = this.stagger.enabled ? staggerDelay : 0;
       const hStackDur = this.timing.vStackDur * this.timing.hSpeedMult;
       const hStackStart = H.transformEnd + hDelay;
       const hStackFinish = (this.stack.growOnJoin && hLandingTime) ? hLandingTime : hStackStart + hStackDur;
       const hLand = hLandingTime || hStackFinish;
-      
+
       if (forwardOnly) {
+        mainFrames.push(
+          { time: H.transformStart, props: grid },
+          { time: H.transformEnd, props: hShrunk },
+          { time: hStackStart, props: hShrunk },
+          { time: hStackFinish, props: hStacked },
+          { time: H.holdEnd, props: hStacked }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, H.holdEnd);
-          opValsArr.push(1, 0, 0);  // Disappear when landing, stay hidden
+          opValsArr.push(1, 0, 0);
         } else {
           opKeyArr.push(H.transformStart, H.holdEnd);
-          opValsArr.push(1, 1);  // Stay visible at stacked position
+          opValsArr.push(1, 1);
         }
       } else {
         const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
         const hUnstackStart = H.holdEnd + hReverseDelay;
-        
+        const hUnstackFinish = hUnstackStart + hStackDur;
+
+        mainFrames.push(
+          { time: H.transformStart, props: grid },
+          { time: H.transformEnd, props: hShrunk },
+          { time: hStackStart, props: hShrunk },
+          { time: hStackFinish, props: hStacked },
+          { time: H.holdEnd, props: hStacked },
+          { time: hUnstackStart, props: hStacked },
+          { time: hUnstackFinish, props: hShrunk },
+          { time: H.untransformEnd, props: grid },
+          { time: H.end, props: grid }
+        );
         if (this.stack.growOnJoin) {
           opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, hUnstackStart, hUnstackStart + 0.001, H.end);
           opValsArr.push(1, 0, 0, 1, 1);
@@ -186,21 +139,23 @@ class RectCellRenderer extends BaseCellRenderer {
         }
       }
     } else if (!forwardOnly) {
+      mainFrames.push({ time: this.totalDuration, props: grid });
       opKeyArr.push(this.totalDuration);
       opValsArr.push(1);
     }
-    
+
+    const main = AnimationTimeline.fromKeyframes(this.totalDuration, mainFrames);
     const opKeyTimes = opKeyArr.map(t => this.f(t)).join('; ');
     const opVals = opValsArr.join('; ');
 
     return `<rect x="${x}" y="${y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="2" ry="2" fill="${color}">
-    <animate attributeName="y" values="${yVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="height" values="${hVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="x" values="${xVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="width" values="${wVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="fill" values="${cVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="rx" values="${rVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="ry" values="${rVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="y" values="${main.y.values}" keyTimes="${main.y.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="height" values="${main.height.values}" keyTimes="${main.height.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="x" values="${main.x.values}" keyTimes="${main.x.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="width" values="${main.width.values}" keyTimes="${main.width.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="fill" values="${main.fill.values}" keyTimes="${main.fill.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="rx" values="${main.r.values}" keyTimes="${main.r.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="ry" values="${main.r.values}" keyTimes="${main.r.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="opacity" values="${opVals}" keyTimes="${opKeyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </rect>`;
   }
