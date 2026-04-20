@@ -7,7 +7,7 @@
  * Animation sequence (per cycle):
  * 1. Show grid with original colors
  * 2. Empty cells fade out; active cells transform (shrink or become circles)
- * 3. Transformed elements slide and stack together (with optional stagger)
+ * 3. Transformed elements slide and stack together
  * 4. Hold at stacked position
  * 5. Reverse: unstack, un-transform, fade in empty cells
  * 
@@ -37,20 +37,8 @@ function loadConfig() {
       mode: 'both',
       loop: true
     },
-    stagger: {
-      enabled: false,
-      order: 'left-to-right',
-      maxDelay: 0.5
-    },
     transform: {
       style: 'rectangle'
-    },
-    stack: {
-      growOnJoin: true,
-      steppedReverse: true
-    },
-    colors: {
-      barColor: '#216e39'
     }
   };
 
@@ -69,22 +57,14 @@ function loadConfig() {
   // Merge with defaults
   const config = {
     animation: { ...defaults.animation, ...fileConfig.animation },
-    stagger: { ...defaults.stagger, ...fileConfig.stagger },
-    transform: { ...defaults.transform, ...fileConfig.transform },
-    stack: { ...defaults.stack, ...fileConfig.stack },
-    colors: { ...defaults.colors, ...fileConfig.colors }
+    transform: { ...defaults.transform, ...fileConfig.transform }
   };
 
   // Environment variable overrides (for GitHub Actions)
   if (process.env.SVG_SPEED) config.animation.speed = process.env.SVG_SPEED;
   if (process.env.SVG_MODE) config.animation.mode = process.env.SVG_MODE;
   if (process.env.SVG_LOOP) config.animation.loop = process.env.SVG_LOOP === 'true';
-  if (process.env.SVG_STAGGER_ENABLED) config.stagger.enabled = process.env.SVG_STAGGER_ENABLED === 'true';
-  if (process.env.SVG_STAGGER_ORDER) config.stagger.order = process.env.SVG_STAGGER_ORDER;
-  if (process.env.SVG_STAGGER_MAX_DELAY) config.stagger.maxDelay = parseFloat(process.env.SVG_STAGGER_MAX_DELAY);
   if (process.env.SVG_TRANSFORM_STYLE) config.transform.style = process.env.SVG_TRANSFORM_STYLE;
-  if (process.env.SVG_GROW_ON_JOIN) config.stack.growOnJoin = process.env.SVG_GROW_ON_JOIN === 'true';
-  if (process.env.SVG_BAR_COLOR) config.colors.barColor = process.env.SVG_BAR_COLOR;
 
   return config;
 }
@@ -163,7 +143,7 @@ function generateSVG(contributionData, config, theme = 'light') {
   let vSolidBars = [];
   let hSolidBars = [];
   
-  // Pre-calculate landing data for all columns (for growOnJoin)
+  // Pre-calculate landing data for all columns
   const columnLandingData = [];
   weeks.forEach((week, weekIndex) => {
     // Collect active cells in this column with their positions
@@ -207,7 +187,7 @@ function generateSVG(contributionData, config, theme = 'light') {
           startX: x,
           width: barWidth,
           targetX,
-          weekIndex  // Track weekIndex for stagger calculation
+          weekIndex
         });
         stackOffset += barWidth;
       }
@@ -250,23 +230,18 @@ function generateSVG(contributionData, config, theme = 'light') {
         const hBarWidth = renderer.getCellStackWidth(day);
         const hX = gridLeft + (hPositions[dayIndex] || 0);
         
-        // Calculate stagger delay for this cell
-        const staggerDelay = renderer.calculateStaggerDelay(weekIndex, dayIndex, numWeeks);
-        
         // Look up landing times from pre-calculated data
         const vLandingEntry = columnLandingData[weekIndex]?.find(
           d => Math.abs(d.startY - y) < 1
         );
-        // Offset landing time by stagger delay so circle lands when bar expects it
-        const vLandingTime = vLandingEntry ? (vLandingEntry.landingTime + staggerDelay) : undefined;
+        const vLandingTime = vLandingEntry ? vLandingEntry.landingTime : undefined;
         const vPrevCumulativeHeight = vLandingEntry ? (vLandingEntry.cumulativeHeight - vLandingEntry.height) : 0;
         const vCumulativeHeight = vLandingEntry ? vLandingEntry.cumulativeHeight : 0;
         
         // For horizontal, find this cell's landing time in its row
         const hActiveIndex = weeks.slice(0, weekIndex).filter(w => w.days[dayIndex]?.heightMultiplier > 0).length;
         const hLandingEntry = rowLandingData[dayIndex]?.[hActiveIndex];
-        // Offset by stagger delay for horizontal too
-        const hLandingTime = hLandingEntry ? (hLandingEntry.landingTime + staggerDelay) : undefined;
+        const hLandingTime = hLandingEntry ? hLandingEntry.landingTime : undefined;
         const hPrevCumulativeWidth = hLandingEntry ? (hLandingEntry.cumulativeWidth - hLandingEntry.width) : 0;
         const hCumulativeWidth = hLandingEntry ? hLandingEntry.cumulativeWidth : 0;
         
@@ -283,7 +258,6 @@ function generateSVG(contributionData, config, theme = 'light') {
           hW: hBarWidth,
           hTotalWidth: dayStacks[dayIndex].totalWidth,
           hGridLeft: gridLeft,
-          staggerDelay,
           level: day.level,
           vStackIndex: vActiveIndex,
           hStackIndex: hActiveIndex,
@@ -311,15 +285,6 @@ function generateSVG(contributionData, config, theme = 'light') {
       const y = gridBottom - h;
       let landingData = columnLandingData[weekIndex] || [];
       
-      // Offset landing times by column's stagger delay
-      if (config.stagger?.enabled) {
-        const columnStaggerDelay = renderer.calculateStaggerDelay(weekIndex, 0, numWeeks);
-        landingData = landingData.map(d => ({
-          ...d,
-          landingTime: d.landingTime + columnStaggerDelay
-        }));
-      }
-      
       const bar = renderer.renderVerticalBar(x, y, CELL_SIZE, h, landingData);
       if (bar) vSolidBars.push(bar);
     }
@@ -332,22 +297,6 @@ function generateSVG(contributionData, config, theme = 'light') {
       const x = gridLeft;
       const y = gridTop + dayIndex * CELL_TOTAL;
       let landingData = rowLandingData[dayIndex] || [];
-      
-      // Offset landing times by each cell's stagger delay
-      if (config.stagger?.enabled) {
-        landingData = landingData.map(d => ({
-          ...d,
-          landingTime: d.landingTime + renderer.calculateStaggerDelay(d.weekIndex, dayIndex, numWeeks)
-        }));
-        // Re-sort by adjusted landing time
-        landingData.sort((a, b) => a.landingTime - b.landingTime);
-        // Recalculate cumulative widths
-        let cumWidth = 0;
-        landingData.forEach(d => {
-          cumWidth += d.width;
-          d.cumulativeWidth = cumWidth;
-        });
-      }
       
       const bar = renderer.renderHorizontalBar(x, y, w, CELL_SIZE, landingData);
       if (bar) hSolidBars.push(bar);
@@ -399,9 +348,6 @@ async function main() {
   console.log(`Generating SVG for ${contributionData.username} (${contributionData.totalContributions} contributions)`);
   console.log(`Transform style: ${renderer.getName()}`);
   console.log(`Animation timing: V=${timingInfo.vCycle.duration.toFixed(1)}s, H=${timingInfo.hCycle.duration.toFixed(1)}s, Total=${timingInfo.total.toFixed(1)}s`);
-  if (config.stagger.enabled) {
-    console.log(`Stagger: ${config.stagger.order}, max delay ${config.stagger.maxDelay}s`);
-  }
 
   // Support custom output path via env var (for reusable action)
   let basePath = process.env.SVG_OUTPUT_PATH || path.join(__dirname, '..', 'data', 'contributions.svg');

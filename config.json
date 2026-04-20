@@ -4,19 +4,7 @@
     "mode": "both",
     "loop": true
   },
-  "stagger": {
-    "enabled": false,
-    "order": "left-to-right",
-    "maxDelay": 0.5
-  },
   "transform": {
     "style": "rectangle"
-  },
-  "stack": {
-    "growOnJoin": true,
-    "steppedReverse": true
-  },
-  "colors": {
-    "barColor": "#216e39"
   }
 }

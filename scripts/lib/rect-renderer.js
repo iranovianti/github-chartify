@@ -19,7 +19,7 @@ class RectCellRenderer extends BaseCellRenderer {
   }
 
   renderActiveCell(cellData) {
-    const { x, y, color, vY, vH, hX, hW, staggerDelay, vLandingTime, hLandingTime } = cellData;
+    const { x, y, color, vY, vH, hX, hW, vLandingTime, hLandingTime } = cellData;
     const V = this.vCycle.times;
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
@@ -37,10 +37,9 @@ class RectCellRenderer extends BaseCellRenderer {
     const opValsArr = [];
 
     if (this.includeVertical) {
-      const vDelay = this.stagger.enabled ? staggerDelay : 0;
       const vStackDur = this.timing.vStackDur;
-      const vStackStart = V.transformEnd + vDelay;
-      const vStackFinish = (this.stack.growOnJoin && vLandingTime) ? vLandingTime : vStackStart + vStackDur;
+      const vStackStart = V.transformEnd;
+      const vStackFinish = vLandingTime || (vStackStart + vStackDur);
       const vLand = vLandingTime || vStackFinish;
 
       if (forwardOnly) {
@@ -52,16 +51,11 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: vStackFinish, props: vStacked },
           { time: V.holdEnd, props: vStacked }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, V.holdEnd);
-          opValsArr.push(1, 1, 0, 0);
-        } else {
-          opKeyArr.push(V.start, V.holdEnd);
-          opValsArr.push(1, 1);
-        }
+        opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, V.holdEnd);
+        opValsArr.push(1, 1, 0, 0);
       } else {
         let vUnstackStart, vUnstackFinish;
-        if (this.stack.growOnJoin && vLandingTime) {
+        if (vLandingTime) {
           const stackDur = V.stackEnd - V.transformEnd;
           const unstackDur = V.unstackEnd - V.holdEnd;
           const landingFraction = stackDur > 0 ? (vLandingTime - V.transformEnd) / stackDur : 0;
@@ -69,8 +63,7 @@ class RectCellRenderer extends BaseCellRenderer {
           vUnstackStart = V.holdEnd + departFraction * unstackDur;
           vUnstackFinish = V.unstackEnd;
         } else {
-          const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-          vUnstackStart = V.holdEnd + vReverseDelay;
+          vUnstackStart = V.holdEnd;
           vUnstackFinish = vUnstackStart + vStackDur;
         }
 
@@ -87,14 +80,8 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: V.untransformEnd, props: grid },
           { time: V.end, props: grid }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, vUnstackStart, vUnstackStart + 0.001, V.end);
-          opValsArr.push(1, 1, 0, 0, 1, 1);
-        } else {
-          const solidFadeTime = 0.15;
-          opKeyArr.push(V.start, vStackFinish, vStackFinish + solidFadeTime, V.holdEnd - solidFadeTime, V.holdEnd, V.end);
-          opValsArr.push(1, 1, 0, 0, 1, 1);
-        }
+        opKeyArr.push(V.start, Math.max(V.start, vLand - 0.001), vLand, vUnstackStart, vUnstackStart + 0.001, V.end);
+        opValsArr.push(1, 1, 0, 0, 1, 1);
       }
     } else {
       mainFrames.push({ time: 0, props: grid });
@@ -103,10 +90,9 @@ class RectCellRenderer extends BaseCellRenderer {
     }
 
     if (this.includeHorizontal) {
-      const hDelay = this.stagger.enabled ? staggerDelay : 0;
       const hStackDur = this.timing.vStackDur * this.timing.hSpeedMult;
-      const hStackStart = H.transformEnd + hDelay;
-      const hStackFinish = (this.stack.growOnJoin && hLandingTime) ? hLandingTime : hStackStart + hStackDur;
+      const hStackStart = H.transformEnd;
+      const hStackFinish = hLandingTime || (hStackStart + hStackDur);
       const hLand = hLandingTime || hStackFinish;
 
       if (forwardOnly) {
@@ -117,16 +103,11 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: hStackFinish, props: hStacked },
           { time: H.holdEnd, props: hStacked }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, H.holdEnd);
-          opValsArr.push(1, 0, 0);
-        } else {
-          opKeyArr.push(H.transformStart, H.holdEnd);
-          opValsArr.push(1, 1);
-        }
+        opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, H.holdEnd);
+        opValsArr.push(1, 0, 0);
       } else {
         let hUnstackStart, hUnstackFinish;
-        if (this.stack.growOnJoin && hLandingTime) {
+        if (hLandingTime) {
           const stackDur = H.stackEnd - H.transformEnd;
           const unstackDur = H.unstackEnd - H.holdEnd;
           const landingFraction = stackDur > 0 ? (hLandingTime - H.transformEnd) / stackDur : 0;
@@ -134,8 +115,7 @@ class RectCellRenderer extends BaseCellRenderer {
           hUnstackStart = H.holdEnd + departFraction * unstackDur;
           hUnstackFinish = H.unstackEnd;
         } else {
-          const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-          hUnstackStart = H.holdEnd + hReverseDelay;
+          hUnstackStart = H.holdEnd;
           hUnstackFinish = hUnstackStart + hStackDur;
         }
 
@@ -151,14 +131,8 @@ class RectCellRenderer extends BaseCellRenderer {
           { time: H.untransformEnd, props: grid },
           { time: H.end, props: grid }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, hUnstackStart, hUnstackStart + 0.001, H.end);
-          opValsArr.push(1, 0, 0, 1, 1);
-        } else {
-          const solidFadeTime = 0.15;
-          opKeyArr.push(hStackFinish, hStackFinish + solidFadeTime, H.holdEnd - solidFadeTime, H.holdEnd, H.end);
-          opValsArr.push(1, 0, 0, 1, 1);
-        }
+        opKeyArr.push(Math.max(H.start, hLand - 0.001), hLand, hUnstackStart, hUnstackStart + 0.001, H.end);
+        opValsArr.push(1, 0, 0, 1, 1);
       }
     } else if (!forwardOnly) {
       mainFrames.push({ time: this.totalDuration, props: grid });
@@ -184,11 +158,10 @@ class RectCellRenderer extends BaseCellRenderer {
 
   renderVerticalBar(x, y, w, h, landingData = null) {
     const V = this.vCycle.times;
-    const solidFadeTime = 0.15;
     const forwardOnly = !this.loop;
     const bottomY = y + h;
     
-    if (this.stack.growOnJoin && landingData && landingData.length > 0) {
+    if (landingData && landingData.length > 0) {
       // STEPPED GROWTH: bar grows in steps as each cell lands
       const keyTimesArr = [this.f(0), this.f(V.transformEnd)];
       const heightValsArr = [0, 0];
@@ -261,66 +234,45 @@ class RectCellRenderer extends BaseCellRenderer {
     <animate attributeName="y" values="${yVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="height" values="${heightVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </rect>`;
-    } else if (this.stack.growOnJoin) {
-      // Fallback: linear growth
-      let keyTimes, heightVals, yVals;
-      
-      if (forwardOnly) {
-        keyTimes = [
-          this.f(0), 
-          this.f(V.transformEnd),
-          this.f(V.stackEnd),
-          this.f(V.holdEnd),
-          this.f(this.totalDuration)
-        ].join('; ');
-        heightVals = [0, 0, h, h, h].join('; ');
-        yVals = [bottomY, bottomY, y, y, y].join('; ');
-      } else {
-        keyTimes = [
-          this.f(0), 
-          this.f(V.transformEnd),
-          this.f(V.stackEnd),
-          this.f(V.holdEnd),
-          this.f(V.unstackEnd),
-          this.f(this.totalDuration)
-        ].join('; ');
-        heightVals = [0, 0, h, h, 0, 0].join('; ');
-        yVals = [bottomY, bottomY, y, y, bottomY, bottomY].join('; ');
-      }
-      
-      return `<rect x="${x}" y="${bottomY}" width="${w}" height="0" fill="${this.barColor}">
+    }
+    
+    // Fallback: linear growth
+    let keyTimes, heightVals, yVals;
+    
+    if (forwardOnly) {
+      keyTimes = [
+        this.f(0), 
+        this.f(V.transformEnd),
+        this.f(V.stackEnd),
+        this.f(V.holdEnd),
+        this.f(this.totalDuration)
+      ].join('; ');
+      heightVals = [0, 0, h, h, h].join('; ');
+      yVals = [bottomY, bottomY, y, y, y].join('; ');
+    } else {
+      keyTimes = [
+        this.f(0), 
+        this.f(V.transformEnd),
+        this.f(V.stackEnd),
+        this.f(V.holdEnd),
+        this.f(V.unstackEnd),
+        this.f(this.totalDuration)
+      ].join('; ');
+      heightVals = [0, 0, h, h, 0, 0].join('; ');
+      yVals = [bottomY, bottomY, y, y, bottomY, bottomY].join('; ');
+    }
+    
+    return `<rect x="${x}" y="${bottomY}" width="${w}" height="0" fill="${this.barColor}">
     <animate attributeName="y" values="${yVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="height" values="${heightVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </rect>`;
-    } else {
-      // Original behavior: just fade in/out
-      let keyTimes, opVals;
-      
-      if (forwardOnly) {
-        keyTimes = [
-          this.f(0), this.f(V.stackEnd), this.f(V.stackEnd + solidFadeTime), this.f(V.holdEnd), this.f(this.totalDuration)
-        ].join('; ');
-        opVals = '0; 0; 1; 1; 1';
-      } else {
-        keyTimes = [
-          this.f(0), this.f(V.stackEnd), this.f(V.stackEnd + solidFadeTime), 
-          this.f(V.holdEnd - solidFadeTime), this.f(V.holdEnd), this.f(this.totalDuration)
-        ].join('; ');
-        opVals = '0; 0; 1; 1; 0; 0';
-      }
-      
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${this.barColor}">
-    <animate attributeName="opacity" values="${opVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-  </rect>`;
-    }
   }
 
   renderHorizontalBar(x, y, w, h, landingData = null) {
     const H = this.hCycle.times;
-    const solidFadeTime = 0.15;
     const forwardOnly = !this.loop;
     
-    if (this.stack.growOnJoin && landingData && landingData.length > 0) {
+    if (landingData && landingData.length > 0) {
       // STEPPED GROWTH: bar grows in steps as each cell lands
       const keyTimesArr = [this.f(0), this.f(H.transformEnd)];
       const widthValsArr = [0, 0];
@@ -382,55 +334,35 @@ class RectCellRenderer extends BaseCellRenderer {
       return `<rect x="${x}" y="${y}" width="0" height="${h}" fill="${this.barColor}">
     <animate attributeName="width" values="${widthVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </rect>`;
-    } else if (this.stack.growOnJoin) {
-      // Fallback: linear growth
-      let keyTimes, widthVals;
-      
-      if (forwardOnly) {
-        keyTimes = [
-          this.f(0), 
-          this.f(H.transformEnd),
-          this.f(H.stackEnd),
-          this.f(H.holdEnd),
-          this.f(this.totalDuration)
-        ].join('; ');
-        widthVals = [0, 0, w, w, w].join('; ');
-      } else {
-        keyTimes = [
-          this.f(0), 
-          this.f(H.transformEnd),
-          this.f(H.stackEnd),
-          this.f(H.holdEnd),
-          this.f(H.unstackEnd),
-          this.f(this.totalDuration)
-        ].join('; ');
-        widthVals = [0, 0, w, w, 0, 0].join('; ');
-      }
-      
-      return `<rect x="${x}" y="${y}" width="0" height="${h}" fill="${this.barColor}">
+    }
+    
+    // Fallback: linear growth
+    let keyTimes, widthVals;
+    
+    if (forwardOnly) {
+      keyTimes = [
+        this.f(0), 
+        this.f(H.transformEnd),
+        this.f(H.stackEnd),
+        this.f(H.holdEnd),
+        this.f(this.totalDuration)
+      ].join('; ');
+      widthVals = [0, 0, w, w, w].join('; ');
+    } else {
+      keyTimes = [
+        this.f(0), 
+        this.f(H.transformEnd),
+        this.f(H.stackEnd),
+        this.f(H.holdEnd),
+        this.f(H.unstackEnd),
+        this.f(this.totalDuration)
+      ].join('; ');
+      widthVals = [0, 0, w, w, 0, 0].join('; ');
+    }
+    
+    return `<rect x="${x}" y="${y}" width="0" height="${h}" fill="${this.barColor}">
     <animate attributeName="width" values="${widthVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </rect>`;
-    } else {
-      // Original behavior: just fade in/out
-      let keyTimes, opVals;
-      
-      if (forwardOnly) {
-        keyTimes = [
-          this.f(0), this.f(H.stackEnd), this.f(H.stackEnd + solidFadeTime), this.f(H.holdEnd), this.f(this.totalDuration)
-        ].join('; ');
-        opVals = '0; 0; 1; 1; 1';
-      } else {
-        keyTimes = [
-          this.f(0), this.f(H.stackEnd), this.f(H.stackEnd + solidFadeTime), 
-          this.f(H.holdEnd - solidFadeTime), this.f(H.holdEnd), this.f(this.totalDuration)
-        ].join('; ');
-        opVals = '0; 0; 1; 1; 0; 0';
-      }
-      
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${this.barColor}">
-    <animate attributeName="opacity" values="${opVals}" keyTimes="${keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-  </rect>`;
-    }
   }
 }
 

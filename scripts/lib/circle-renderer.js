@@ -19,7 +19,7 @@ class CircleCellRenderer extends BaseCellRenderer {
   }
 
   renderActiveCell(cellData) {
-    const { x, y, color, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, level, vLandingTime, hLandingTime, vPrevCumulativeHeight, vCumulativeHeight, hPrevCumulativeWidth, hCumulativeWidth } = cellData;
+    const { x, y, color, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, level, vLandingTime, hLandingTime, vPrevCumulativeHeight, vCumulativeHeight, hPrevCumulativeWidth, hCumulativeWidth } = cellData;
     const V = this.vCycle.times;
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
@@ -41,24 +41,16 @@ class CircleCellRenderer extends BaseCellRenderer {
     let hArrivalX = circleX, hArrivalY = circleY;
     let hDepartureX = circleX, hDepartureY = circleY;
     
-    if (this.stack.growOnJoin && this.includeVertical) {
+    if (this.includeVertical) {
       vArrivalY = vGridBottom - (vPrevCumulativeHeight || 0) - diameter;
       vDepartureY = vGridBottom - (vCumulativeHeight || 0);
-    } else if (this.includeVertical) {
-      vArrivalY = vY + vH - diameter;
-      vDepartureY = vArrivalY;
     }
     
-    if (this.stack.growOnJoin && this.includeHorizontal) {
+    if (this.includeHorizontal) {
       hArrivalX = hGridLeft + (hPrevCumulativeWidth || 0);
       hArrivalY = circleY;
       hDepartureX = hGridLeft + (hCumulativeWidth || 0) - diameter;
       hDepartureY = circleY;
-    } else if (this.includeHorizontal) {
-      hArrivalX = hX;
-      hArrivalY = cy - radius;
-      hDepartureX = hArrivalX;
-      hDepartureY = hArrivalY;
     }
 
     // Animation states as rect properties
@@ -74,9 +66,8 @@ class CircleCellRenderer extends BaseCellRenderer {
     const opValsArr = [];
     
     if (this.includeVertical) {
-      const vDelay = this.stagger.enabled ? staggerDelay : 0;
       const vStackDur = this.timing.vStackDur;
-      const vStackStart = V.transformEnd + vDelay;
+      const vStackStart = V.transformEnd;
       const vStackFinish = vLandingTime || (vStackStart + vStackDur);
       
       if (forwardOnly) {
@@ -88,16 +79,11 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: vStackFinish, props: vArrival },
           { time: V.holdEnd, props: vArrival }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, V.holdEnd);
-          opValsArr.push(1, 1, 0, 0);
-        } else {
-          opKeyArr.push(V.start, V.holdEnd);
-          opValsArr.push(1, 1);
-        }
+        opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, V.holdEnd);
+        opValsArr.push(1, 1, 0, 0);
       } else {
         let vUnstackStart, vUnstackFinish;
-        if (this.stack.growOnJoin && vLandingTime) {
+        if (vLandingTime) {
           const stackDur = V.stackEnd - V.transformEnd;
           const unstackDur = V.unstackEnd - V.holdEnd;
           const landingFraction = stackDur > 0 ? (vLandingTime - V.transformEnd) / stackDur : 0;
@@ -105,8 +91,7 @@ class CircleCellRenderer extends BaseCellRenderer {
           vUnstackStart = V.holdEnd + departFraction * unstackDur;
           vUnstackFinish = V.unstackEnd;
         } else {
-          const vReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-          vUnstackStart = V.holdEnd + vReverseDelay;
+          vUnstackStart = V.holdEnd;
           vUnstackFinish = vUnstackStart + vStackDur;
         }
         
@@ -123,14 +108,8 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: V.untransformEnd, props: grid },
           { time: V.end, props: grid }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, vUnstackStart, vUnstackStart + 0.001, V.end);
-          opValsArr.push(1, 1, 0, 0, 1, 1);
-        } else {
-          const solidFadeTime = 0.15;
-          opKeyArr.push(V.start, vStackFinish, vStackFinish + solidFadeTime, V.holdEnd - solidFadeTime, V.holdEnd, V.end);
-          opValsArr.push(1, 1, 0, 0, 1, 1);
-        }
+        opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, vUnstackStart, vUnstackStart + 0.001, V.end);
+        opValsArr.push(1, 1, 0, 0, 1, 1);
       }
     } else {
       mainFrames.push({ time: 0, props: grid });
@@ -139,9 +118,8 @@ class CircleCellRenderer extends BaseCellRenderer {
     }
     
     if (this.includeHorizontal) {
-      const hDelay = this.stagger.enabled ? staggerDelay : 0;
       const hStackDur = this.timing.vStackDur * this.timing.hSpeedMult;
-      const hStackStart = H.transformEnd + hDelay;
+      const hStackStart = H.transformEnd;
       const hStackFinish = hLandingTime || (hStackStart + hStackDur);
       
       if (forwardOnly) {
@@ -152,16 +130,11 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: hStackFinish, props: hArrival },
           { time: H.holdEnd, props: hArrival }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, H.holdEnd);
-          opValsArr.push(1, 0, 0);
-        } else {
-          opKeyArr.push(H.transformStart, H.holdEnd);
-          opValsArr.push(1, 1);
-        }
+        opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, H.holdEnd);
+        opValsArr.push(1, 0, 0);
       } else {
         let hUnstackStart, hUnstackFinish;
-        if (this.stack.growOnJoin && hLandingTime) {
+        if (hLandingTime) {
           const stackDur = H.stackEnd - H.transformEnd;
           const unstackDur = H.unstackEnd - H.holdEnd;
           const landingFraction = stackDur > 0 ? (hLandingTime - H.transformEnd) / stackDur : 0;
@@ -169,8 +142,7 @@ class CircleCellRenderer extends BaseCellRenderer {
           hUnstackStart = H.holdEnd + departFraction * unstackDur;
           hUnstackFinish = H.unstackEnd;
         } else {
-          const hReverseDelay = this.stagger.enabled ? (this.stagger.maxDelay - staggerDelay) : 0;
-          hUnstackStart = H.holdEnd + hReverseDelay;
+          hUnstackStart = H.holdEnd;
           hUnstackFinish = hUnstackStart + hStackDur;
         }
         
@@ -186,14 +158,8 @@ class CircleCellRenderer extends BaseCellRenderer {
           { time: H.untransformEnd, props: grid },
           { time: H.end, props: grid }
         );
-        if (this.stack.growOnJoin) {
-          opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, hUnstackStart, hUnstackStart + 0.001, H.end);
-          opValsArr.push(1, 0, 0, 1, 1);
-        } else {
-          const solidFadeTime = 0.15;
-          opKeyArr.push(hStackFinish, hStackFinish + solidFadeTime, H.holdEnd - solidFadeTime, H.holdEnd, H.end);
-          opValsArr.push(1, 0, 0, 1, 1);
-        }
+        opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, hUnstackStart, hUnstackStart + 0.001, H.end);
+        opValsArr.push(1, 0, 0, 1, 1);
       }
     } else if (!forwardOnly) {
       mainFrames.push({ time: this.totalDuration, props: grid });
@@ -218,11 +184,6 @@ class CircleCellRenderer extends BaseCellRenderer {
   }
 
   renderVerticalBar(x, y, w, h, landingData = null) {
-    if (!this.stack.growOnJoin) {
-      // Without growOnJoin, circles are visible throughout - no bar needed
-      return '';
-    }
-    
     const V = this.vCycle.times;
     const bottomY = y + h;
     const forwardOnly = !this.loop;
@@ -257,7 +218,7 @@ class CircleCellRenderer extends BaseCellRenderer {
       
       if (!forwardOnly) {
         // Add shrink animation only if looping
-        if (this.stack.steppedReverse && !this.stagger.enabled) {
+        {
           // STEPPED SHRINK: bar shrinks in steps as circles depart (reverse order - last landed leaves first)
           const unstackDur = V.unstackEnd - V.holdEnd;
           const stackDur = V.stackEnd - V.transformEnd;
@@ -341,11 +302,6 @@ class CircleCellRenderer extends BaseCellRenderer {
   }
 
   renderHorizontalBar(x, y, w, h, landingData = null) {
-    if (!this.stack.growOnJoin) {
-      // Without growOnJoin, circles are visible throughout - no bar needed
-      return '';
-    }
-    
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
     
@@ -372,7 +328,7 @@ class CircleCellRenderer extends BaseCellRenderer {
       
       if (!forwardOnly) {
         // Add shrink animation only if looping
-        if (this.stack.steppedReverse && !this.stagger.enabled) {
+        {
           // STEPPED SHRINK: bar shrinks in steps as circles depart (reverse order)
           const unstackDur = H.unstackEnd - H.holdEnd;
           const stackDur = H.stackEnd - H.transformEnd;

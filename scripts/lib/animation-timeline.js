@@ -135,8 +135,7 @@ class CycleFactory {
       gridHold,
       transformDur,
       stackDur,
-      stackedHold,
-      staggerExtra = 0
+      stackedHold
     } = config;
 
     let cycleDuration;
@@ -148,7 +147,6 @@ class CycleFactory {
         gridHold +           // Initial grid hold
         transformDur +       // Transform (shrink/morph)
         stackDur +           // Stack animation
-        staggerExtra +       // Extra time for stagger
         stackedHold;         // Hold at stacked position (ends here)
 
       let t = offset;
@@ -156,7 +154,7 @@ class CycleFactory {
         start: t,
         transformStart: t += gridHold,
         transformEnd: t += transformDur,
-        stackEnd: t += stackDur + staggerExtra,
+        stackEnd: t += stackDur,
         holdEnd: t += stackedHold,
         // For forward-only, these are all at holdEnd (no reverse)
         unstackEnd: t,
@@ -169,10 +167,8 @@ class CycleFactory {
         gridHold +           // Initial grid hold
         transformDur +       // Transform (shrink/morph)
         stackDur +           // Stack animation
-        staggerExtra +       // Extra time for stagger
         stackedHold +        // Hold at stacked position
         stackDur +           // Unstack animation
-        staggerExtra +       // Extra time for stagger
         transformDur +       // Untransform
         gridHold;            // Final grid hold
 
@@ -181,9 +177,9 @@ class CycleFactory {
         start: t,
         transformStart: t += gridHold,
         transformEnd: t += transformDur,
-        stackEnd: t += stackDur + staggerExtra,
+        stackEnd: t += stackDur,
         holdEnd: t += stackedHold,
-        unstackEnd: t += stackDur + staggerExtra,
+        unstackEnd: t += stackDur,
         untransformEnd: t += transformDur,
         end: t += gridHold
       };

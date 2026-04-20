@@ -72,24 +72,10 @@ class BaseCellRenderer {
     // For no-loop mode, use forward-only cycles (no reverse animation)
     const forwardOnly = !this.loop;
     
-    this.stagger = config.stagger || { enabled: false };
-    this.stack = config.stack || { growOnJoin: false };
-    
-    // Bar color: support theme-specific colors or use theme-appropriate defaults
-    const defaultLightBarColor = '#216e39';
-    const defaultDarkBarColor = '#39d353';
-    const configBarColor = config.colors?.barColor;
-    
-    // If config specifies a barColor that's the default light color, use theme defaults
-    // Otherwise respect the config value
-    if (!configBarColor || configBarColor === defaultLightBarColor) {
-      this.barColor = theme === 'dark' ? defaultDarkBarColor : defaultLightBarColor;
-    } else {
-      this.barColor = configBarColor;
-    }
+    // Bar color: theme-appropriate defaults
+    this.barColor = theme === 'dark' ? '#39d353' : '#216e39';
     
     // Calculate cycle timings
-    this.staggerExtra = this.stagger.enabled ? this.stagger.maxDelay : 0;
     
     // Only include cycles for the modes we need
     if (this.includeVertical) {
@@ -97,8 +83,7 @@ class BaseCellRenderer {
         gridHold: this.timing.gridHold,
         transformDur: this.timing.transformDur,
         stackDur: this.timing.vStackDur,
-        stackedHold: this.timing.stackedHold,
-        staggerExtra: this.staggerExtra
+        stackedHold: this.timing.stackedHold
       }, 0, forwardOnly);
     } else {
       // Dummy cycle with zero duration
@@ -110,8 +95,7 @@ class BaseCellRenderer {
         gridHold: this.timing.gridHold,
         transformDur: this.timing.transformDur,
         stackDur: this.timing.vStackDur * this.timing.hSpeedMult,
-        stackedHold: this.timing.stackedHold,
-        staggerExtra: this.staggerExtra
+        stackedHold: this.timing.stackedHold
       }, this.vCycle.duration, forwardOnly);
     } else {
       // Dummy cycle starting after vCycle
@@ -120,9 +104,6 @@ class BaseCellRenderer {
     }
     
     this.totalDuration = this.vCycle.duration + this.hCycle.duration;
-    
-    // Random delays cache for stagger
-    this.randomDelays = {};
   }
 
   /**
@@ -187,45 +168,6 @@ class BaseCellRenderer {
       hCycle: this.hCycle,
       total: this.totalDuration
     };
-  }
-
-  /**
-   * Calculate stagger delay for a cell
-   */
-  calculateStaggerDelay(weekIndex, dayIndex, numWeeks) {
-    if (!this.stagger.enabled) return 0;
-    
-    let normalizedPosition;
-    
-    switch (this.stagger.order) {
-      case 'left-to-right':
-        normalizedPosition = weekIndex / (numWeeks - 1);
-        break;
-      case 'right-to-left':
-        normalizedPosition = 1 - (weekIndex / (numWeeks - 1));
-        break;
-      case 'top-to-bottom':
-        normalizedPosition = dayIndex / (DAYS_IN_WEEK - 1);
-        break;
-      case 'bottom-to-top':
-        normalizedPosition = 1 - (dayIndex / (DAYS_IN_WEEK - 1));
-        break;
-      case 'diagonal':
-        normalizedPosition = (weekIndex + dayIndex) / (numWeeks - 1 + DAYS_IN_WEEK - 1);
-        break;
-      case 'random':
-        const key = `${weekIndex}-${dayIndex}`;
-        if (!(key in this.randomDelays)) {
-          this.randomDelays[key] = Math.random();
-        }
-        normalizedPosition = this.randomDelays[key];
-        break;
-      case 'none':
-      default:
-        normalizedPosition = 0;
-    }
-    
-    return normalizedPosition * this.stagger.maxDelay;
   }
 
   /**
@@ -354,7 +296,6 @@ class BaseCellRenderer {
 
   /**
    * Calculate per-cell vertical landing times for a column
-   * Used for growOnJoin mode
    * @param {Array} columnCells - Array of {startY, height, targetY} for each active cell
    * @returns {Array} Array of {landingTime, height, cumulativeHeight, startY} sorted by landing time
    */
@@ -416,7 +357,6 @@ class BaseCellRenderer {
 
   /**
    * Calculate per-cell horizontal landing times for a row
-   * Used for growOnJoin mode
    * @param {Array} rowCells - Array of {startX, width, targetX} for each active cell
    * @returns {Array} Array of {landingTime, width, cumulativeWidth, startX} sorted by landing time
    */
@@ -455,7 +395,7 @@ class BaseCellRenderer {
         landingFraction,
         width: cell.width,
         startX: cell.startX,
-        weekIndex: cell.weekIndex  // Preserve for stagger calculation
+        weekIndex: cell.weekIndex
       };
     });
     
