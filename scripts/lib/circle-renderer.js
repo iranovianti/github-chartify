@@ -1,38 +1,17 @@
 /**
- * CircleCellRenderer - Renders cells as 1-4 circles in a 2x2 grid
- * Level 1=1 circle, Level 2=2 (diagonal), Level 3=3, Level 4=4
+ * CircleCellRenderer - Renders cells as single circles with variable radius
+ * Level 1=small, Level 2=medium, Level 3=large, Level 4=full size
  */
 
 const {
   BaseCellRenderer,
   CELL_SIZE,
-  LEVEL_TO_COUNT
+  LEVEL_TO_MULTIPLIER
 } = require('./base-renderer');
 const { AnimationTimeline } = require('./animation-timeline');
 
-// Circle sizing
-const CIRCLE_RADIUS = 2.5;
-const CIRCLE_SPACING = CIRCLE_RADIUS * 2 + 1; // diameter + gap
-
-// Grid positions within a cell (cx, cy offsets from cell top-left)
-function getCirclePositions(cellX, cellY) {
-  const inset = CIRCLE_RADIUS + 0.5;
-  const spacing = CELL_SIZE - 2 * inset;
-  return [
-    { cx: cellX + inset, cy: cellY + inset },                    // top-left [0]
-    { cx: cellX + inset + spacing, cy: cellY + inset },          // top-right [1]
-    { cx: cellX + inset, cy: cellY + inset + spacing },          // bottom-left [2]
-    { cx: cellX + inset + spacing, cy: cellY + inset + spacing } // bottom-right [3]
-  ];
-}
-
-// Which circle positions to use for each level
-const LEVEL_POSITIONS = {
-  1: [0],           // top-left only
-  2: [0, 3],        // diagonal
-  3: [0, 1, 2],     // three corners
-  4: [0, 1, 2, 3]   // all four
-};
+// Maximum circle radius (half the cell, with small inset)
+const MAX_RADIUS = CELL_SIZE / 2;
 
 class CircleCellRenderer extends BaseCellRenderer {
   getName() {
@@ -40,61 +19,38 @@ class CircleCellRenderer extends BaseCellRenderer {
   }
 
   renderActiveCell(cellData) {
-    const { x, y, color, vY, vTotalHeight, hX, hTotalWidth, staggerDelay, level, vStackIndex, hStackIndex, vLandingTime, hLandingTime } = cellData;
-    const V = this.vCycle.times;
-    const H = this.hCycle.times;
-    
-    const count = LEVEL_TO_COUNT[level] || 0;
-    if (count === 0) return this.renderEmptyCell(x, y, color);
-    
-    const positions = getCirclePositions(x, y);
-    const activePositions = LEVEL_POSITIONS[count];
-    
-    // Each circle needs to be rendered with its own animation
-    const elements = [];
-    
-    // First, render the background rect that fades out during transform
-    elements.push(this.renderEmptyCell(x, y, color));
-    
-    // Then render each circle
-    activePositions.forEach((posIndex, circleIndex) => {
-      const pos = positions[posIndex];
-      elements.push(this._renderCircle(pos, circleIndex, count, cellData, vLandingTime, hLandingTime));
-    });
-    
-    return elements.join('\n  ');
-  }
-
-  _renderCircle(pos, circleIndex, totalCircles, cellData, vLandingTime, hLandingTime) {
-    const { x, y, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, vStackIndex, hStackIndex } = cellData;
+    const { x, y, color, vY, vH, vTotalHeight, vGridBottom, hX, hTotalWidth, hGridLeft, staggerDelay, level, vLandingTime, hLandingTime } = cellData;
     const V = this.vCycle.times;
     const H = this.hCycle.times;
     const forwardOnly = !this.loop;
     
-    // Original position
-    const originalCx = pos.cx;
-    const originalCy = pos.cy;
+    const multiplier = LEVEL_TO_MULTIPLIER[level] || 0;
+    if (multiplier === 0) return this.renderEmptyCell(x, y, color);
     
-    // Compute stacked positions
-    let vStackedCy = originalCy, hStackedCx = originalCx, hStackedCy = originalCy;
+    const radius = Math.round(Math.sqrt(multiplier) * MAX_RADIUS * 10) / 10;
+    const cx = x + CELL_SIZE / 2;
+    const cy = y + CELL_SIZE / 2;
+
+    // Stacked positions
+    let vStackedCy = cy, hStackedCx = cx, hStackedCy = cy;
     
     if (this.stack.growOnJoin && this.includeVertical) {
-      vStackedCy = vGridBottom - vTotalHeight + CIRCLE_RADIUS;
-    } else if (!this.stack.growOnJoin && this.includeVertical) {
-      vStackedCy = vY + vH - (circleIndex * CIRCLE_SPACING) - CIRCLE_RADIUS;
+      vStackedCy = vGridBottom - vTotalHeight + radius;
+    } else if (this.includeVertical) {
+      vStackedCy = vY + vH - radius;
     }
     
     if (this.stack.growOnJoin && this.includeHorizontal) {
-      hStackedCx = hGridLeft + hTotalWidth - CIRCLE_RADIUS;
-      hStackedCy = originalCy;
-    } else if (!this.stack.growOnJoin && this.includeHorizontal) {
-      hStackedCx = hX + (circleIndex * CIRCLE_SPACING) + CIRCLE_RADIUS;
+      hStackedCx = hGridLeft + hTotalWidth - radius;
+      hStackedCy = cy;
+    } else if (this.includeHorizontal) {
+      hStackedCx = hX + radius;
       hStackedCy = y + CELL_SIZE / 2;
     }
 
     // Animation states
-    const grid    = { cx: originalCx, cy: originalCy };
-    const vStacked = { cx: originalCx, cy: vStackedCy };
+    const grid     = { cx, cy };
+    const vStacked = { cx, cy: vStackedCy };
     const hStacked = { cx: hStackedCx, cy: hStackedCy };
 
     const mainFrames = [];
@@ -230,12 +186,15 @@ class CircleCellRenderer extends BaseCellRenderer {
     const main = AnimationTimeline.fromKeyframes(this.totalDuration, mainFrames);
     const opKeyTimes = opKeyArr.map(t => this.f(t)).join('; ');
     const opVals = opValsArr.join('; ');
-    
-    return `<circle cx="${originalCx}" cy="${originalCy}" r="${CIRCLE_RADIUS}" fill="${this.barColor}">
+
+    const bgRect = this.renderEmptyCell(x, y, color);
+    const circle = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${this.barColor}">
     <animate attributeName="cx" values="${main.cx.values}" keyTimes="${main.cx.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="cy" values="${main.cy.values}" keyTimes="${main.cy.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="opacity" values="${opVals}" keyTimes="${opKeyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
   </circle>`;
+
+    return `${bgRect}\n  ${circle}`;
   }
 
   renderVerticalBar(x, y, w, h, landingData = null) {
