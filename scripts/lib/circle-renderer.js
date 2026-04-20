@@ -28,40 +28,46 @@ class CircleCellRenderer extends BaseCellRenderer {
     if (multiplier === 0) return this.renderEmptyCell(x, y, color);
     
     const radius = Math.round(Math.sqrt(multiplier) * MAX_RADIUS * 10) / 10;
+    const diameter = radius * 2;
     const cx = x + CELL_SIZE / 2;
     const cy = y + CELL_SIZE / 2;
 
-    // Arrival = bar top BEFORE this cell lands; Departure = bar top AFTER (used in reverse, invisible during hold)
-    let vArrivalCy = cy, vDepartureCy = cy;
-    let hArrivalCx = cx, hArrivalCy = cy;
-    let hDepartureCx = cx, hDepartureCy = cy;
+    // Circle state (rect that looks like a circle): centered in cell
+    const circleX = cx - radius;
+    const circleY = cy - radius;
+
+    // Stacked positions (as rect top-left)
+    let vArrivalY = circleY, vDepartureY = circleY;
+    let hArrivalX = circleX, hArrivalY = circleY;
+    let hDepartureX = circleX, hDepartureY = circleY;
     
     if (this.stack.growOnJoin && this.includeVertical) {
-      vArrivalCy = vGridBottom - (vPrevCumulativeHeight || 0);
-      vDepartureCy = vGridBottom - (vCumulativeHeight || 0);
+      vArrivalY = vGridBottom - (vPrevCumulativeHeight || 0) - diameter;
+      vDepartureY = vGridBottom - (vCumulativeHeight || 0);
     } else if (this.includeVertical) {
-      vArrivalCy = vY + vH - radius;
-      vDepartureCy = vArrivalCy;
+      vArrivalY = vY + vH - diameter;
+      vDepartureY = vArrivalY;
     }
     
     if (this.stack.growOnJoin && this.includeHorizontal) {
-      hArrivalCx = hGridLeft + (hPrevCumulativeWidth || 0);
-      hArrivalCy = cy;
-      hDepartureCx = hGridLeft + (hCumulativeWidth || 0);
-      hDepartureCy = cy;
+      hArrivalX = hGridLeft + (hPrevCumulativeWidth || 0);
+      hArrivalY = circleY;
+      hDepartureX = hGridLeft + (hCumulativeWidth || 0) - diameter;
+      hDepartureY = circleY;
     } else if (this.includeHorizontal) {
-      hArrivalCx = hX + radius;
-      hArrivalCy = y + CELL_SIZE / 2;
-      hDepartureCx = hArrivalCx;
-      hDepartureCy = hArrivalCy;
+      hArrivalX = hX;
+      hArrivalY = cy - radius;
+      hDepartureX = hArrivalX;
+      hDepartureY = hArrivalY;
     }
 
-    // Animation states
-    const grid       = { cx, cy };
-    const vArrival   = { cx, cy: vArrivalCy };
-    const vDeparture = { cx, cy: vDepartureCy };
-    const hArrival   = { cx: hArrivalCx, cy: hArrivalCy };
-    const hDeparture = { cx: hDepartureCx, cy: hDepartureCy };
+    // Animation states as rect properties
+    const grid       = { x, y, width: CELL_SIZE, height: CELL_SIZE, rx: 2, fill: color };
+    const circle     = { x: circleX, y: circleY, width: diameter, height: diameter, rx: radius, fill: this.barColor };
+    const vArrival   = { x: circleX, y: vArrivalY, width: diameter, height: diameter, rx: radius, fill: this.barColor };
+    const vDeparture = { x: circleX, y: vDepartureY, width: diameter, height: diameter, rx: radius, fill: this.barColor };
+    const hArrival   = { x: hArrivalX, y: hArrivalY, width: diameter, height: diameter, rx: radius, fill: this.barColor };
+    const hDeparture = { x: hDepartureX, y: hDepartureY, width: diameter, height: diameter, rx: radius, fill: this.barColor };
 
     const mainFrames = [];
     const opKeyArr = [];
@@ -77,21 +83,21 @@ class CircleCellRenderer extends BaseCellRenderer {
         mainFrames.push(
           { time: V.start, props: grid },
           { time: V.transformStart, props: grid },
-          { time: V.transformEnd, props: grid },
-          { time: vStackStart, props: grid },
+          { time: V.transformEnd, props: circle },
+          { time: vStackStart, props: circle },
           { time: vStackFinish, props: vArrival },
           { time: V.holdEnd, props: vArrival }
         );
         if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, V.transformStart, V.transformEnd, Math.max(V.transformEnd, vStackFinish - 0.001), vStackFinish, V.holdEnd);
-          opValsArr.push(0, 0, 1, 1, 0, 0);
+          opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, V.holdEnd);
+          opValsArr.push(1, 1, 0, 0);
         } else {
-          opKeyArr.push(V.start, V.transformStart, V.transformEnd, V.holdEnd);
-          opValsArr.push(0, 0, 1, 1);
+          opKeyArr.push(V.start, V.holdEnd);
+          opValsArr.push(1, 1);
         }
       } else {
         let vUnstackStart, vUnstackFinish;
-        if (this.stack.steppedReverse && vLandingTime) {
+        if (this.stack.growOnJoin && vLandingTime) {
           const stackDur = V.stackEnd - V.transformEnd;
           const unstackDur = V.unstackEnd - V.holdEnd;
           const landingFraction = stackDur > 0 ? (vLandingTime - V.transformEnd) / stackDur : 0;
@@ -107,28 +113,29 @@ class CircleCellRenderer extends BaseCellRenderer {
         mainFrames.push(
           { time: V.start, props: grid },
           { time: V.transformStart, props: grid },
-          { time: V.transformEnd, props: grid },
-          { time: vStackStart, props: grid },
+          { time: V.transformEnd, props: circle },
+          { time: vStackStart, props: circle },
           { time: vStackFinish, props: vArrival },
           { time: V.holdEnd, props: vDeparture },
           { time: vUnstackStart, props: vDeparture },
-          { time: vUnstackFinish, props: grid },
-          { time: V.unstackEnd, props: grid },
+          { time: vUnstackFinish, props: circle },
+          { time: V.unstackEnd, props: circle },
           { time: V.untransformEnd, props: grid },
           { time: V.end, props: grid }
         );
         if (this.stack.growOnJoin) {
-          opKeyArr.push(V.start, V.transformStart, V.transformEnd, Math.max(V.transformEnd, vStackFinish - 0.001), vStackFinish, vUnstackStart, vUnstackStart + 0.001, V.unstackEnd, V.untransformEnd, V.end);
-          opValsArr.push(0, 0, 1, 1, 0, 0, 1, 1, 0, 0);
+          opKeyArr.push(V.start, Math.max(V.start, vStackFinish - 0.001), vStackFinish, vUnstackStart, vUnstackStart + 0.001, V.end);
+          opValsArr.push(1, 1, 0, 0, 1, 1);
         } else {
-          opKeyArr.push(V.start, V.transformStart, V.transformEnd, V.unstackEnd, V.untransformEnd, V.end);
-          opValsArr.push(0, 0, 1, 1, 0, 0);
+          const solidFadeTime = 0.15;
+          opKeyArr.push(V.start, vStackFinish, vStackFinish + solidFadeTime, V.holdEnd - solidFadeTime, V.holdEnd, V.end);
+          opValsArr.push(1, 1, 0, 0, 1, 1);
         }
       }
     } else {
       mainFrames.push({ time: 0, props: grid });
       opKeyArr.push(0);
-      opValsArr.push(0);
+      opValsArr.push(1);
     }
     
     if (this.includeHorizontal) {
@@ -139,22 +146,22 @@ class CircleCellRenderer extends BaseCellRenderer {
       
       if (forwardOnly) {
         mainFrames.push(
-          { time: H.transformStart, props: grid },
-          { time: H.transformEnd, props: grid },
-          { time: hStackStart, props: grid },
+          { time: H.transformStart, props: circle },
+          { time: H.transformEnd, props: circle },
+          { time: hStackStart, props: circle },
           { time: hStackFinish, props: hArrival },
           { time: H.holdEnd, props: hArrival }
         );
         if (this.stack.growOnJoin) {
-          opKeyArr.push(H.transformStart, H.transformEnd, Math.max(H.transformEnd, hStackFinish - 0.001), hStackFinish, H.holdEnd);
-          opValsArr.push(0, 1, 1, 0, 0);
+          opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, H.holdEnd);
+          opValsArr.push(1, 0, 0);
         } else {
-          opKeyArr.push(H.transformStart, H.transformEnd, H.holdEnd);
-          opValsArr.push(0, 1, 1);
+          opKeyArr.push(H.transformStart, H.holdEnd);
+          opValsArr.push(1, 1);
         }
       } else {
         let hUnstackStart, hUnstackFinish;
-        if (this.stack.steppedReverse && hLandingTime) {
+        if (this.stack.growOnJoin && hLandingTime) {
           const stackDur = H.stackEnd - H.transformEnd;
           const unstackDur = H.unstackEnd - H.holdEnd;
           const landingFraction = stackDur > 0 ? (hLandingTime - H.transformEnd) / stackDur : 0;
@@ -168,43 +175,46 @@ class CircleCellRenderer extends BaseCellRenderer {
         }
         
         mainFrames.push(
-          { time: H.transformStart, props: grid },
-          { time: H.transformEnd, props: grid },
-          { time: hStackStart, props: grid },
+          { time: H.transformStart, props: circle },
+          { time: H.transformEnd, props: circle },
+          { time: hStackStart, props: circle },
           { time: hStackFinish, props: hArrival },
           { time: H.holdEnd, props: hDeparture },
           { time: hUnstackStart, props: hDeparture },
-          { time: hUnstackFinish, props: grid },
-          { time: H.unstackEnd, props: grid },
+          { time: hUnstackFinish, props: circle },
+          { time: H.unstackEnd, props: circle },
           { time: H.untransformEnd, props: grid },
           { time: H.end, props: grid }
         );
         if (this.stack.growOnJoin) {
-          opKeyArr.push(H.transformStart, H.transformEnd, Math.max(H.transformEnd, hStackFinish - 0.001), hStackFinish, hUnstackStart, hUnstackStart + 0.001, H.unstackEnd, H.untransformEnd, H.end);
-          opValsArr.push(0, 1, 1, 0, 0, 1, 1, 0, 0);
+          opKeyArr.push(Math.max(H.start, hStackFinish - 0.001), hStackFinish, hUnstackStart, hUnstackStart + 0.001, H.end);
+          opValsArr.push(1, 0, 0, 1, 1);
         } else {
-          opKeyArr.push(H.transformStart, H.transformEnd, H.unstackEnd, H.untransformEnd, H.end);
-          opValsArr.push(0, 1, 1, 0, 0);
+          const solidFadeTime = 0.15;
+          opKeyArr.push(hStackFinish, hStackFinish + solidFadeTime, H.holdEnd - solidFadeTime, H.holdEnd, H.end);
+          opValsArr.push(1, 0, 0, 1, 1);
         }
       }
     } else if (!forwardOnly) {
       mainFrames.push({ time: this.totalDuration, props: grid });
       opKeyArr.push(this.totalDuration);
-      opValsArr.push(0);
+      opValsArr.push(1);
     }
     
     const main = AnimationTimeline.fromKeyframes(this.totalDuration, mainFrames);
     const opKeyTimes = opKeyArr.map(t => this.f(t)).join('; ');
     const opVals = opValsArr.join('; ');
 
-    const bgRect = this.renderEmptyCell(x, y, color);
-    const circle = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${this.barColor}">
-    <animate attributeName="cx" values="${main.cx.values}" keyTimes="${main.cx.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-    <animate attributeName="cy" values="${main.cy.values}" keyTimes="${main.cy.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    return `<rect x="${x}" y="${y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="2" ry="2" fill="${color}">
+    <animate attributeName="x" values="${main.x.values}" keyTimes="${main.x.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="y" values="${main.y.values}" keyTimes="${main.y.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="width" values="${main.width.values}" keyTimes="${main.width.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="height" values="${main.height.values}" keyTimes="${main.height.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="rx" values="${main.rx.values}" keyTimes="${main.rx.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="ry" values="${main.rx.values}" keyTimes="${main.rx.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
+    <animate attributeName="fill" values="${main.fill.values}" keyTimes="${main.fill.keyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
     <animate attributeName="opacity" values="${opVals}" keyTimes="${opKeyTimes}" dur="${this.totalDuration}s" repeatCount="${this.repeatCount}"${this.fillFreeze}/>
-  </circle>`;
-
-    return `${bgRect}\n  ${circle}`;
+  </rect>`;
   }
 
   renderVerticalBar(x, y, w, h, landingData = null) {
