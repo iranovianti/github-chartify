@@ -8,11 +8,11 @@ branding:
   color: 'green'
 
 inputs:
-  github_username:
+  username:
     description: 'GitHub username to fetch contributions for (defaults to repository owner)'
     required: false
     default: ${{ github.repository_owner }}
-  output_path:
+  output:
     description: 'Path to save the generated SVG'
     required: false
     default: 'data/contributions.svg'
@@ -28,7 +28,7 @@ inputs:
     description: 'Whether animation loops indefinitely'
     required: false
     default: 'true'
-  transform_style:
+  style:
     description: 'Transform style: rectangle or circles'
     required: false
     default: 'rectangle'
@@ -56,7 +56,7 @@ runs:
       id: fetch
       shell: bash
       env:
-        GITHUB_USERNAME: ${{ inputs.github_username }}
+        GITHUB_USERNAME: ${{ inputs.username }}
       run: |
         node ${{ github.action_path }}/scripts/fetch-contributions.js
         echo "total_contributions=$(node -e "console.log(require('${{ github.action_path }}/data/contributions.json').totalContributions)")" >> $GITHUB_OUTPUT
@@ -68,12 +68,12 @@ runs:
         SVG_SPEED: ${{ inputs.speed }}
         SVG_MODE: ${{ inputs.mode }}
         SVG_LOOP: ${{ inputs.loop }}
-        SVG_TRANSFORM_STYLE: ${{ inputs.transform_style }}
-        SVG_OUTPUT_PATH: ${{ inputs.output_path }}
+        SVG_TRANSFORM_STYLE: ${{ inputs.style }}
+        SVG_OUTPUT_PATH: ${{ inputs.output }}
       run: |
         node ${{ github.action_path }}/scripts/generate-svg.js
-        echo "svg_path=${{ inputs.output_path }}" >> $GITHUB_OUTPUT
+        echo "svg_path=${{ inputs.output }}" >> $GITHUB_OUTPUT
         # Compute dark version path
-        DARK_PATH="${{ inputs.output_path }}"
+        DARK_PATH="${{ inputs.output }}"
         DARK_PATH="${DARK_PATH%.svg}-dark.svg"
         echo "svg_path_dark=$DARK_PATH" >> $GITHUB_OUTPUT
